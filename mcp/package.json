@@ -1,0 +1,18 @@
+{
+  "name": "geoffrey-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-account email and calendar for any MCP client",
+  "bin": {
+    "geoffrey-mcp": "./src/index.js",
+    "geoffrey-add-account": "./bin/add-account.js"
+  },
+  "scripts": {
+    "add-account": "node bin/add-account.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

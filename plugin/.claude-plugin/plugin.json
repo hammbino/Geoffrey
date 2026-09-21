@@ -1,0 +1,9 @@
+{
+  "name": "geoffrey",
+  "displayName": "Geoffrey",
+  "version": "0.1.0",
+  "description": "Turns requests into finished, verified work. Remembers across sessions in plain files, reads every one of your mailboxes and calendars, and never sends anything without you.",
+  "author": { "name": "Nerd Hero" },
+  "repository": "https://github.com/hammbino/Geoffrey",
+  "skills": "./skills/"
+}

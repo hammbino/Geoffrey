@@ -1,0 +1,20 @@
+{
+  "name": "nerd-hero",
+  "owner": {
+    "name": "Nerd Hero",
+    "url": "https://github.com/hammbino"
+  },
+  "description": "Geoffrey — a personal assistant that works the same in Claude Code, Claude Desktop, and on your phone.",
+  "plugins": [
+    {
+      "name": "geoffrey",
+      "source": "./plugin",
+      "displayName": "Geoffrey",
+      "description": "Turns requests into finished, verified work. Remembers across sessions in plain files, reads every one of your mailboxes and calendars, and never sends anything without you.",
+      "version": "0.1.0",
+      "author": { "name": "Nerd Hero" },
+      "keywords": ["assistant", "email", "calendar", "memory"],
+      "category": "productivity"
+    }
+  ]
+}

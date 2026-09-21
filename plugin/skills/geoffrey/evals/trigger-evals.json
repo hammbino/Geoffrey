@@ -1,0 +1,23 @@
+[
+  {"query": "im drowning today. can you look at whats sitting in my inbox and just tell me what actually needs me before 5", "should_trigger": true},
+  {"query": "what did i tell Dana i'd get back to her about? i know i promised her something week before last and its bugging me", "should_trigger": true},
+  {"query": "there's a guy who emailed about the Brightside quote. can you put together a reply for me, i want to read it before it goes anywhere", "should_trigger": true},
+  {"query": "i've got three mailboxes now and im missing things in all of them. the personal one, the nerdhero one, and the old one. can you get on top of this", "should_trigger": true},
+  {"query": "remind me what we landed on for the pricing thing, i had a whole conversation about it and now i cant remember which way we went", "should_trigger": true},
+  {"query": "call with the accountant at 2. what do i need to have in front of me", "should_trigger": true},
+  {"query": "for future reference i dont take meetings before 10am, ever. please dont put anything there", "should_trigger": true},
+  {"query": "whos waiting on me right now? i have a feeling im the holdup on two things and i cant think what they are", "should_trigger": true},
+  {"query": "can you go through last week and tell me what i actually got done, i need it for the invoice", "should_trigger": true},
+  {"query": "someone from a company called Optimus emailed twice and i havent replied and now its awkward. help", "should_trigger": true},
+
+  {"query": "write me a python script that parses an mbox export and counts messages per sender, output as csv", "should_trigger": false},
+  {"query": "how do i set up a gmail filter so anything from my landlord skips the inbox and gets a label", "should_trigger": false},
+  {"query": "whats the actual difference between imap and pop3, my email client is asking and i dont know which to pick", "should_trigger": false},
+  {"query": "my calendar app keeps crashing when i open it on my phone, its the ios one. any idea whats going on", "should_trigger": false},
+  {"query": "draft me a blog post about how to stop being busy all the time, around 800 words, punchy", "should_trigger": false},
+  {"query": "add a calendar widget to the dashboard component in src/components/Dashboard.tsx, it should show the next 7 days", "should_trigger": false},
+  {"query": "remember that in this repo we use tabs not spaces, the linter config is wrong and i keep having to fix it", "should_trigger": false},
+  {"query": "what exactly does the gmail.modify scope let an app do? im trying to work out if i can avoid it", "should_trigger": false},
+  {"query": "can you review this PR before i merge it, its the auth refactor, about 400 lines", "should_trigger": false},
+  {"query": "i need to send a newsletter to about 2000 people, whats the best tool for that, mailchimp or something else", "should_trigger": false}
+]

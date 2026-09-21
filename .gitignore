@@ -1,0 +1,13 @@
+.DS_Store
+*.log
+.env
+.env.local
+node_modules/
+
+# Never commit OAuth material
+client_secret*.json
+tokens.json
+accounts.json
+
+# Session-tool state (remember plugin): logs, pids, scratch
+.remember/
