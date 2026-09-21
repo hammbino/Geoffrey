@@ -54,7 +54,14 @@ first user**. No person's name appears in any of the three installable pieces.
 
 ### What v1 does not do
 
-- Send email, post, pay, or delete. Ever. Draft and label; a human sends.
+- Send email, post, pay, or delete through Geoffrey's own tools. Ever. Draft
+  and label; a human sends. Upstream agrees for mail (`outreach-composer`,
+  `invoice-chase`, `hiring-screener` are draft-only), for payroll (`run_payroll`
+  is never called), and for payments (`pay-the-bills` *stages* a run behind two
+  approvals; nothing auto-pays). Writes to a ledger or CRM through a connector
+  we do not own are gated by upstream's approval prompts — a prompt-level gate,
+  accepted as such because there is no tool surface of ours to put a boundary
+  in. §5 states this distinction.
 - Build any connector Anthropic already offers.
 - Rewrite the SMB skills. They are forked and patched at the seams; the
   upstream is tracked and merged, never re-derived.
@@ -229,12 +236,19 @@ apps via Customize → Plugins. All 44 upstream skills, `smb-router`, and
    `memory/` in the owner's repo — the local clone when present, the
    `*_memory` tools otherwise. The `## Business context` block lives in
    `memory/business.md`. One search-and-patch, kept as a documented diff.
-2. **Accounts.** In `shared/connector-neutrality.md` and
-   `connector-call-shapes.md`, Geoffrey joins the Mail, Calendar, and Files
-   categories as a peer whose calls take an `account`. Skills that read mail or
-   files are told: when Geoffrey is connected, ask `list_accounts` and run
-   across all of them, naming each. Gmail and Microsoft 365 built-ins remain
-   listed for owners who never connect Geoffrey's server.
+2. **Accounts.** Upstream skills name mail, calendar, and files by
+   *category* ("Gmail or M365, whichever is connected") and read
+   `shared/connector-call-shapes.md` before their first call to any connector.
+   Measured against upstream at v1.35.1: only two files name concrete Gmail
+   tool names (`contract-review/reference/gmail-fetch.md`,
+   `business-pulse/reference/data_sources.md`). So the patch is: Geoffrey joins
+   the Mail, Calendar, and Files categories in `connector-neutrality.md`, gets
+   a row in `connector-call-shapes.md` ("every call takes `account`; call
+   `list_accounts` first and run across all of them, naming each"), and those
+   two reference files gain a Geoffrey paragraph. Four files. Gmail and
+   Microsoft 365 built-ins stay listed for owners who never connect Geoffrey's
+   server. Whether four files is enough is proven by running skills (§9), not
+   by reading the diff.
 3. **Onboarding.** `smb-onboard` loses its connector-setup moves (the
    installer did them) and keeps the interview, the first-recipe run, the
    profile, and the weekly cadence. It writes the profile through seam 1.
@@ -362,6 +376,16 @@ to `memory/` in one repository the owner chose in their browser, returns the
 previous contents, and is one commit — reversible by design. Email-sourced
 text can pollute memory; it cannot reach anything else through it. The
 `geoffrey` skill's rule to mark inferences as such is the courtesy layer on top.
+
+**Connectors Geoffrey does not own** (the ledger, CRM, payroll, and payments
+servers in the plugin's `.mcp.json`) have write tools we cannot fence. There
+the boundary is upstream's: two-gate approvals, totals stated before the
+question, "recurrence is not consent," and `shared/untrusted-content.md`. That
+is a prompt-level gate and the spec says so plainly rather than pretending
+otherwise. It is the same gate Anthropic ships to every Small Business user;
+Geoffrey does not weaken it and does not claim to strengthen it. What Geoffrey
+*can* fence — its own mail, calendar, files, sheets, and memory — it fences in
+the tool surface.
 
 The same pattern is how any future write tool (calendar event creation,
 OneDrive) earns its way in: a server-side allowlist or scope the owner set in a
@@ -508,8 +532,11 @@ in dependency order:
    memory round trip from a surface with no clone.
 7. Connect page.
 8. Template additions and the sync discipline.
-9. Fork the SMB plugin as a subtree; patch the three seams; run the two seam
-   proofs in §9.
+9. Fork the SMB plugin as a subtree; patch the three seams (four files for
+   seam 2, measured); run the two seam proofs in §9. This is the one stage
+   whose size is not known until the proofs run: if the skills do not fan out
+   across accounts on four files, the fallback is to leave upstream unpatched
+   and put the fan-out in Geoffrey's own skill instead.
 10. Installer, step by step, each with its checkpoint and failure path.
 11. Run the evals. Run the acceptance test on a clean user account.
 12. Hand to the first user, in person. Fix what breaks. Only then, the next
