@@ -66,8 +66,10 @@ sees it:
 2. From the phone, in ordinary Claude chat: ask Geoffrey to compare a value in
    a sheet held in one Google account against an email in a different account.
    Geoffrey answers correctly and names both accounts.
-3. Ask Geoffrey to update that sheet. Geoffrey shows the intended change, the
-   owner approves, the write lands, Geoffrey shows before and after.
+3. Ask Geoffrey to update that sheet — one that was *not* selected during
+   setup. Geoffrey shows the intended change, is refused, relays the approval
+   link; the owner taps Allow on the phone; Geoffrey retries, the write lands,
+   and shows before and after.
 4. A week later, in Claude Code on the Mac, Geoffrey recalls something it
    learned in step 2 without being reminded.
 5. Repeat step 2 with a Microsoft mailbox as one of the two accounts.
@@ -95,9 +97,11 @@ Before starting the owner needs a Mac, a paid Claude plan, and a GitHub account
    signs into a Google account, then is asked *"another one?"* — Microsoft,
    another Google, until they say done. Each grant is verified with a live read
    of the inbox before it is saved. For each Google account the page then lists
-   their spreadsheets and asks which ones Geoffrey may **write** to; unchecked
-   sheets stay read-only forever unless the owner comes back here. Checkpoint:
-   the server reports every account readable.
+   their spreadsheets and asks which ones Geoffrey may **write** to, so they
+   can start day one — and says, right there, that reading needs no permission
+   and that any other sheet can be allowed later with one tap when Geoffrey
+   first needs it (§5). Skippable. Checkpoint: the server reports every
+   account readable.
 5. **"Teaching Claude to be Geoffrey."** Registers the hosted connector and
    installs the plugin in Claude Code. Checkpoint: from a fresh `claude`
    session, `list_accounts` returns every account connected in step 4.
@@ -207,6 +211,12 @@ skills only where a task needs more than the spine gives it (a weekly brief, a
 chase-overdue loop). Add a skill when a task keeps needing the same procedure;
 don't add one speculatively.
 
+The `geoffrey` skill gains the sheet-write handling: show the intended change,
+call `update_sheet`, and on refusal relay the approval link with a one-line
+explanation of why ("I can read any sheet; writing needs your okay once per
+sheet — tap to allow"). It also tells the owner, the first time it comes up,
+that the connect page is where to see and change the list.
+
 Status: `geoffrey` written; two eval suites written and never run.
 
 ### 3.4 `setup/` — the installer
@@ -228,7 +238,13 @@ New. A few pages served by the Worker:
 - Add a Google account / add a Microsoft account. Runs the provider OAuth,
   verifies the grant with a live read, saves it, shows the result.
 - For each Google account: list spreadsheets, check the ones Geoffrey may write
-  to. This is the only way onto the allowlist.
+  to. Shows the current list; any entry can be revoked.
+- An approval page for one sheet, reached from the link the server returns
+  when a write is refused (§5). Shows the sheet's name and account, one
+  **Allow** button. Links are signed and expire.
+- Every page that touches sheets explains the two ways onto the list in one
+  short paragraph: pick them here, or allow one when Geoffrey asks. These two
+  pages and the server's refusal message are the only ways onto the allowlist.
 - List connected accounts; remove one.
 
 The installer opens it in step 4. The owner returns to it later to add an
@@ -277,12 +293,19 @@ consequential action lives in the tool surface, not in a prompt. Email is
 untrusted input; a sheet write is a consequential action; v1 puts both in one
 context window. So the boundary is enforced by the server:
 
-1. **Allowlist.** The owner chooses writable sheets on the connect page, in
-   their browser, signed in as themselves. There is no tool that adds to the
-   allowlist. A model that has been told by an email to "record this in the
-   vendor sheet" cannot expand its own permissions.
+1. **Allowlist, two ways on.** Reading any sheet needs no permission; the list
+   governs writes only. The owner adds sheets either up front on the connect
+   page during setup, or **ad hoc**: when Geoffrey is refused (item 2) it
+   relays a one-tap approval link, the owner opens it, sees the sheet's name
+   and account on a page the server built, and taps Allow. Either way the
+   decision is made in the owner's browser, signed in as themselves. There is
+   no tool that adds to the allowlist. A model told by an email to "record
+   this in the vendor sheet" can make Geoffrey *ask*; it cannot make Geoffrey
+   *allowed*.
 2. **Refusal is the default.** `update_sheet` on any sheet not on the list
-   returns an error naming the connect page. It does not ask; it refuses.
+   returns an error carrying the sheet's name and a signed, expiring approval
+   link for that one sheet. It does not write; it refuses. The `geoffrey`
+   skill relays the link and, once the owner has tapped Allow, retries.
 3. **Every write is visible.** `update_sheet` returns the range's contents
    before and after. The `geoffrey` skill shows the intended change and gets
    approval before calling, and shows the result after. The skill rule is
@@ -389,8 +412,9 @@ Each is cheap, each would change the plan if wrong, so each is an early task:
 
 ## 9. Testing
 
-- **Unit:** the sheet-write allowlist (refuses unlisted, allows listed, returns
-  before/after, caps cells), `write_memory` path confinement and stale-head
+- **Unit:** the sheet-write allowlist (refuses unlisted with a signed link,
+  rejects tampered or expired links, allows listed, returns before/after, caps
+  cells), `write_memory` path confinement and stale-head
   refusal, OData escaping, `account` validation on every mailbox tool. Fast,
   no network.
 - **Smoke:** `mcp/smoke-test.mjs` against the stdio server and against
