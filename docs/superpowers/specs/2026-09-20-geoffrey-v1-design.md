@@ -116,9 +116,13 @@ one thing to try, and the exact line to paste to resume *from that step*.
 Never "start over." State lives in `~/.geoffrey/setup-state.json`; every step
 is idempotent, so re-running a completed step is harmless.
 
-Floor: one paste, four browser sign-ins (Claude, GitHub, Google, Microsoft),
-two clicks at claude.ai. Anything below this breaks Anthropic's login rule or
-requires hosting the owner's memory.
+Honest floor: one paste; four browser sign-ins (Claude, GitHub, Google,
+Microsoft); and two flows at claude.ai, each of which is a URL to paste plus an
+OAuth round trip to `GEOFFREY_URL` (which signs the owner in with GitHub
+again). Adding the connector in Claude Code (step 5) triggers the same round
+trip. So the owner authenticates to Geoffrey twice or three times, not zero.
+Anything below this breaks Anthropic's login rule or requires hosting the
+owner's memory.
 
 ---
 
@@ -143,6 +147,10 @@ stdio process for local development and tests.
   with GitHub as the upstream identity.
 - **Owner ↔ provider auth.** Google and Microsoft OAuth, browser-based, on the
   connect page (§3.5). Refresh tokens stored; access tokens minted per call.
+- **Two token stores, one interface.** Hosted, tokens live in the owner's
+  Durable Object; the stdio path used for development and tests keeps
+  `~/.geoffrey/accounts.json`. `store.js` becomes the interface both implement
+  so providers and tools never know which one they are on.
 - **Tools.** Every tool takes `account`. Omitting it is a validation error.
 
 | Tool | Notes |
@@ -349,6 +357,9 @@ Each is cheap, each would change the plan if wrong, so each is an early task:
 3. Anthropic's **connector directory** entries for the §2 step 7 menu exist and
    install cleanly. The menu ships with what's proven.
 4. Google's **100-user cap** counts people or grants (§7).
+5. **Memory can be written from Desktop and mobile chat.** Whatever path §6
+   settles on, its write capability gates the product claim, not one surface.
+   Most load-bearing item on this list.
 
 ---
 
