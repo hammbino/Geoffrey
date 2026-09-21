@@ -51,7 +51,9 @@ first user**. No person's name appears in any of the three installable pieces.
   own onboarding and memory; two assistants in one client is a worse product.
   The installer mentions it as optional for owners who use Cowork.
 - OneDrive / Excel. Microsoft is mail and calendar in v1.
-- Hosted memory. Memory is the GitHub repo (§6).
+- Hold the owner's memory on the server. Memory is the owner's GitHub repo;
+  the server reads and writes it through the GitHub API on the owner's behalf
+  and stores none of it (§6).
 
 ### Acceptance test
 
@@ -137,11 +139,14 @@ stdio process for local development and tests.
 
 - **Identity.** The owner signs into Geoffrey with GitHub. That one identity
   keys their account store, is what Claude authenticates against when the
-  connector is added, and is the same account that owns their memory repo. No
-  Geoffrey password exists.
+  connector is added, and is the same account that owns their memory repo. The
+  GitHub grant is scoped to that one repository, so the server can read and
+  commit memory on the owner's behalf and nothing else. No Geoffrey password
+  exists.
 - **Storage.** One Durable Object per owner holding: provider refresh tokens,
-  the account registry (`id`, `provider`, `address`, `purpose`), and the
-  sheet-write allowlist. Isolation per owner is structural — there is no shared
+  the GitHub token and memory-repo name, the account registry (`id`,
+  `provider`, `address`, `purpose`), and the sheet-write allowlist. No memory
+  content is stored on the server; it is fetched from the repo per call. Isolation per owner is structural — there is no shared
   table to mis-filter.
 - **Claude ↔ Geoffrey auth.** OAuth via the Cloudflare Agents SDK provider,
   with GitHub as the upstream identity.
@@ -163,8 +168,12 @@ stdio process for local development and tests.
 | `get_file` | One file's text: Docs exported as text, Sheets as CSV of a range, others as plain text where Drive can export it. Capped. |
 | `read_sheet` | A range from one sheet, as rows. |
 | `update_sheet` | A range write. Refused unless the sheet is on the owner's allowlist. Returns `{before, after}`. Capped at a fixed number of cells per call. |
+| `list_memory` | Paths under `memory/` in the owner's repo, with sizes. No contents. These tools take no `account`; memory belongs to the owner, not a mailbox. |
+| `read_memory` | One file's text from the repo, at the current head. |
+| `write_memory` | Create or replace one file under `memory/`, committed to the repo with a one-line message. Refuses any path outside `memory/`. Returns the commit sha and the previous contents. |
 
-There is no send tool and no tool that edits the allowlist.
+There is no send tool, no tool that edits the allowlist, and no tool that
+writes outside `memory/`.
 
 - **Status.** Mail, labels, drafts, calendar exist and pass the smoke test for
   Google. Microsoft provider is written, never run against a real mailbox. Drive
@@ -182,6 +191,8 @@ Additions for v1:
   current by Geoffrey. This is how Geoffrey knows it has Stripe and what to
   reach for it for.
 - The sync discipline in §6, stated in `CLAUDE.md` so every surface follows it.
+- `CLAUDE.md` tells Geoffrey which memory path it is on: the local clone when
+  the folder is present, the `*_memory` tools otherwise. Same files either way.
 
 ### 3.3 `plugin/` — the behavior
 
@@ -242,7 +253,9 @@ account or a sheet without re-running anything.
 (connector, authenticated as the owner via GitHub) → Worker resolves the
 owner's Durable Object → mints a provider access token from the stored refresh
 token → calls Gmail / Graph / Drive → returns references, not payloads. Memory
-reads and writes go through the GitHub connector to the owner's repo.
+goes through the same connector: `read_memory` fetches a file from the owner's
+repo via the GitHub API; `write_memory` commits one. No second connector, no
+second sign-in.
 
 **A session in Claude Code on the Mac.** Same connector over HTTP. Memory is
 the local clone; the sync discipline in §6 keeps it current.
@@ -277,6 +290,12 @@ context window. So the boundary is enforced by the server:
 4. **Bounded.** A fixed cap on cells per call; no sheet-wide clears; no
    formula injection — values are written as values.
 
+`write_memory` is a write tool and follows the same reasoning: it is confined
+to `memory/` in one repository the owner chose in their browser, returns the
+previous contents, and is one commit — reversible by design. Email-sourced
+text can pollute memory; it cannot reach anything else through it. The
+`geoffrey` skill's rule to mark inferences as such is the courtesy layer on top.
+
 The same pattern is how any future write tool (calendar event creation,
 OneDrive) earns its way in: a server-side allowlist or scope the owner set in a
 browser, refusal by default, the diff returned.
@@ -285,8 +304,9 @@ browser, refusal by default, the diff returned.
 
 ## 6. Memory: one repo, three writers
 
-Claude Code on the Mac, a cloud Code session, and Desktop (through the GitHub
-connector) all write `memory/`. Git detects conflicts; it does not resolve
+Claude Code on the Mac (local clone), a cloud Code session (its own clone), and
+Desktop or mobile chat (the `*_memory` tools, committing through the GitHub
+API) all write `memory/`. Git detects conflicts; it does not resolve
 them, and a merge conflict in `memory/user.md` is not something an owner can be
 asked to fix. The discipline, stated in the template's `CLAUDE.md`:
 
@@ -303,9 +323,12 @@ asked to fix. The discipline, stated in the template's `CLAUDE.md`:
 Small files help: one fact per file in `people/`, `projects/`, `decisions/`,
 `waiting/` means two surfaces rarely touch the same file.
 
-Surfaces that cannot run git (Desktop chat via the GitHub connector) write
-through the connector's file API, which commits per write. That is a coarser
-version of the same discipline and is acceptable.
+Surfaces without a clone use the `*_memory` tools. Each `write_memory` is one
+commit against the repo's current head, so it cannot produce a conflict — if
+the head moved since `read_memory`, the server returns the newer contents and
+the tool call fails; Geoffrey re-reads and writes again. The `before` contents
+come back with every write so a mistaken overwrite is one call from restored.
+This is the same discipline with the server doing the pull-and-retry.
 
 ---
 
@@ -357,17 +380,19 @@ Each is cheap, each would change the plan if wrong, so each is an early task:
 3. Anthropic's **connector directory** entries for the §2 step 7 menu exist and
    install cleanly. The menu ships with what's proven.
 4. Google's **100-user cap** counts people or grants (§7).
-5. **Memory can be written from Desktop and mobile chat.** Whatever path §6
-   settles on, its write capability gates the product claim, not one surface.
-   Most load-bearing item on this list.
+5. **A GitHub OAuth grant scoped to one repository lets the server read and
+   commit through the API** with a token that survives (fine-grained tokens
+   and GitHub App installation tokens are the two candidates). Gates the
+   product claim, not one surface. Most load-bearing item on this list.
 
 ---
 
 ## 9. Testing
 
 - **Unit:** the sheet-write allowlist (refuses unlisted, allows listed, returns
-  before/after, caps cells), OData escaping, `account` validation on every
-  tool. Fast, no network.
+  before/after, caps cells), `write_memory` path confinement and stale-head
+  refusal, OData escaping, `account` validation on every mailbox tool. Fast,
+  no network.
 - **Smoke:** `mcp/smoke-test.mjs` against the stdio server and against
   `GEOFFREY_URL`. Extended to cover every tool, including a Microsoft account
   and a Drive/Sheets pass.
@@ -394,8 +419,9 @@ in dependency order:
    the smoke test.
 5. Drive and Sheets locally: `search_files`, `get_file`, `read_sheet`,
    `update_sheet` with the allowlist, unit-tested.
-6. Host: Worker, per-owner Durable Object, GitHub identity, Claude OAuth.
-   Smoke test against `GEOFFREY_URL`.
+6. Host: Worker, per-owner Durable Object, GitHub identity, Claude OAuth, the
+   three `*_memory` tools. Smoke test against `GEOFFREY_URL`, including a
+   memory round trip from a surface with no clone.
 7. Connect page.
 8. Template additions and the sync discipline. Plugin skill updates.
 9. Installer, step by step, each with its checkpoint and failure path.
