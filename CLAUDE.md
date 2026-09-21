@@ -11,10 +11,11 @@ verification costs.
 
 - `assistant-template/` — cloned into a private repo per person. Keep it
   user-agnostic and free of anyone's name.
-- `plugin/skills/geoffrey/SKILL.md` — **one** skill. The previous version of
-  this project had seven, mirrored into three directories, and keeping them in
-  sync consumed more effort than the skills delivered. If something feels like
-  it needs a second skill, first try making the one skill better.
+- `plugin/skills/` — the behavior. `geoffrey/SKILL.md` is the spine; other
+  skills are allowed when a task keeps needing the same procedure, but each has
+  exactly one source of truth here. The previous version had seven skills
+  mirrored into three directories, and the mirroring — not the count — is what
+  rotted. Never copy a skill anywhere else.
 - `mcp/` — the MCP server. Moved in from the archived repo
   (`hammbino/Geoffrey-archive`) on 2026-09-20 at its Slice 2 state: mail,
   labels, drafts, calendar, and an unproven Microsoft provider. This copy is

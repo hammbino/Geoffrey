@@ -43,5 +43,8 @@ be a Testing-status behavior only — an unverified In-Production client held it
 refresh token for 14 days, so one published OAuth client can serve up to 100
 people with no console work by any of them.
 
-Next: calendar, then the setup command. See `docs/distribution-research.md` for
-the full picture and `docs/architecture.md` for why the shape is what it is.
+Calendar, labels, and drafts work for Google; the Microsoft provider is written
+and unproven. The v1 design — hosted server, Drive/Sheets, the installer — is
+`docs/superpowers/specs/2026-09-20-geoffrey-v1-design.md`. See
+`docs/distribution-research.md` for the research and `docs/architecture.md` for
+why the shape is what it is.
