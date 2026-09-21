@@ -1,6 +1,8 @@
 # Geoffrey v1 — design
 
-Written 2026-09-20 from a brainstorm that ran 2026-09-15 through 2026-09-20.
+Written 2026-09-20 from a brainstorm that ran 2026-09-15 through 2026-09-20;
+revised through 2026-09-21 (the fork of Anthropic's Small Business plugin and
+the rule reconciliation came after the first draft).
 This is the spec the implementation plan is written from. `docs/distribution-
 research.md` and `docs/architecture.md` carry the research and the reasoning;
 where they disagree with this document, this document wins.
@@ -88,8 +90,9 @@ sees it:
    setup. Geoffrey shows the intended change, is refused, relays the approval
    link; the owner taps Allow on the phone; Geoffrey retries, the write lands,
    and shows before and after.
-4. A week later, in Claude Code on the Mac, Geoffrey recalls something it
-   learned in step 2 without being reminded.
+4. A week later, in Claude Code on the Mac, Geoffrey recalls, unprompted,
+   something written to memory during onboarding (§2 step 8) or during steps
+   2–3 — which sheet is allowed, which account holds what.
 5. Repeat step 2 with a Microsoft mailbox as one of the two accounts.
 6. Say "who owes me money?" on the phone. The forked `invoice-chase` runs
    across every connected mailbox, names each, and the result matches what
@@ -126,10 +129,11 @@ Before starting the owner needs a Mac, a paid Claude plan, and a GitHub account
 5. **"Teaching Claude to be Geoffrey."** Registers the hosted connector and
    installs the plugin in Claude Code. Checkpoint: from a fresh `claude`
    session, `list_accounts` returns every account connected in step 4.
-6. **The two clicks the installer cannot do.** Adding the connector and the
-   plugin inside the Claude apps happens at claude.ai and has no API. The
-   installer prints the exact click path and the URL to paste, then waits for
-   "done." This is what lights up Desktop and the phone.
+6. **The two flows the installer cannot do.** Adding the connector and the
+   plugin inside the Claude apps happens at claude.ai and has no API; each is
+   a URL to paste plus an OAuth round trip. The installer prints the exact
+   click path and the URL, then waits for "done." This is what lights up
+   Desktop and the phone.
 7. **"What else do you run your business on?"** The plugin's 43 connectors,
    in plain categories (money in, books, customers, files, team), each a click
    path. These ship inside the plugin's `.mcp.json`, so in Claude Code they are
@@ -160,7 +164,7 @@ owner's memory.
 
 ## 3. Components
 
-Five pieces in this repo, plus two console prerequisites.
+Five pieces in this repo, plus three console prerequisites.
 
 ### 3.1 `mcp/` — the server
 
@@ -176,8 +180,8 @@ stdio process for local development and tests.
 - **Storage.** One Durable Object per owner holding: provider refresh tokens,
   the GitHub token and memory-repo name, the account registry (`id`,
   `provider`, `address`, `purpose`), and the sheet-write allowlist. No memory
-  content is stored on the server; it is fetched from the repo per call. Isolation per owner is structural — there is no shared
-  table to mis-filter.
+  content is stored on the server; it is fetched from the repo per call.
+  Isolation per owner is structural — there is no shared table to mis-filter.
 - **Claude ↔ Geoffrey auth.** OAuth via the Cloudflare Agents SDK provider,
   with GitHub as the upstream identity.
 - **Owner ↔ provider auth.** Google and Microsoft OAuth, browser-based, on the
@@ -186,7 +190,8 @@ stdio process for local development and tests.
   Durable Object; the stdio path used for development and tests keeps
   `~/.geoffrey/accounts.json`. `store.js` becomes the interface both implement
   so providers and tools never know which one they are on.
-- **Tools.** Every tool takes `account`. Omitting it is a validation error.
+- **Tools.** Every mailbox, calendar, and file tool takes `account`. Omitting
+  it is a validation error. The memory tools take none — see the table.
 
 | Tool | Notes |
 |---|---|
@@ -219,7 +224,9 @@ Additions for v1:
 - `memory/accounts.md` — which accounts and connectors are attached, and what
   each is for, in the owner's words. Written during "say hello" and kept
   current by Geoffrey. This is how Geoffrey knows it has Stripe and what to
-  reach for it for.
+  reach for it for. It is deliberately separate from `memory/business.md`
+  (§3.3): `business.md` is *who the business is* and changes rarely;
+  `accounts.md` is *what is plugged in* and changes whenever a tool is added.
 - The sync discipline in §6, stated in `CLAUDE.md` so every surface follows it.
 - `CLAUDE.md` tells Geoffrey which memory path it is on: the local clone when
   the folder is present, the `*_memory` tools otherwise. Same files either way.
@@ -251,10 +258,9 @@ apps via Customize → Plugins. All 44 upstream skills, `smb-router`, and
    gain a Geoffrey paragraph. Upstream's `tenant-scope` check ("is this store
    the owner's?") is satisfied by construction for Geoffrey accounts: the
    owner signed into each one, and `list_accounts` carries the address and
-   purpose. Four files. Gmail and
-   Microsoft 365 built-ins stay listed for owners who never connect Geoffrey's
-   server. Whether four files is enough is proven by running skills (§9), not
-   by reading the diff.
+   purpose. Four files in total. The Gmail and Microsoft 365 built-ins stay
+   listed for owners who never connect Geoffrey's server. Whether four files is
+   enough is proven by running skills (§9), not by reading the diff.
 3. **Onboarding.** `smb-onboard` loses its connector-setup moves (the
    installer did them) and keeps the interview, the first-recipe run, the
    profile, and the weekly cadence. It writes the profile through seam 1.
@@ -285,8 +291,9 @@ reconcile — compared rule by rule against upstream at v1.35.1:
   multi-account run that failed on one account says which, rather than
   folding the failure into a smaller total.
 - **Files.** Upstream's "search by name, never browse" is enforced by
-  `search_files` refusing an empty query (§3.1), and by `read_memory` being
-  the only listing-style tool — memory is Geoffrey's own, not a tenant store.
+  `search_files` refusing an empty query (§3.1). `list_memory` is the only
+  listing-style tool, and it is exempt: memory is Geoffrey's own, not a tenant
+  store.
 
 **Tracking upstream.** The fork is a git subtree of the upstream path; merges
 are a plan task on a cadence, and the three seams are the only files expected
@@ -501,8 +508,9 @@ Each is cheap, each would change the plan if wrong, so each is an early task:
 2. A connector **bundled in the plugin** does or does not work in mobile chat.
    The design assumes the manual claude.ai step is required (§2 step 6); if
    bundling works, that step shrinks.
-3. Anthropic's **connector directory** entries for the §2 step 7 menu exist and
-   install cleanly. The menu ships with what's proven.
+3. The **43 connectors in the plugin's `.mcp.json` authorize cleanly in the
+   Claude apps**, not only in Claude Code where the manifest registers them.
+   The §2 step 7 menu ships with what's proven.
 4. Google's **100-user cap** counts people or grants (§7).
 5. **A GitHub OAuth grant scoped to one repository lets the server read and
    commit through the API** with a token that survives (fine-grained tokens
@@ -551,7 +559,7 @@ in dependency order:
 
 1. Harden the moved server (§7 findings). Run the existing smoke test.
 2. Console prerequisites: Google client, Entra registration, `GEOFFREY_URL`.
-3. Verify the four assumptions in §8.
+3. Verify the eight assumptions in §8.
 4. Prove Microsoft locally: connect a real mailbox via `add-account.js`, extend
    the smoke test.
 5. Drive and Sheets locally: `search_files`, `get_file`, `read_sheet`,
