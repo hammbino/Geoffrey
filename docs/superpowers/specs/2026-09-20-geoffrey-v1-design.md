@@ -9,14 +9,18 @@ where they disagree with this document, this document wins.
 
 ## 1. What v1 is
 
-**Geoffrey is what Claude for Small Business should have been: the same job,
-from any device, in any Claude surface, across all of a business owner's
-accounts rather than one.**
+**Geoffrey is Anthropic's Small Business plugin, forked, with the three
+things it lacks: memory the owner owns, every one of the owner's accounts, and
+an installer a business owner finishes alone — on every Claude surface.**
 
-Anthropic shipped Claude for Small Business on 2026-09-15: 31 skills and 43
-connectors, inside the Cowork desktop app only, one Google account and one
-Microsoft account per person. Geoffrey's difference is exactly the part they
-did not build:
+Anthropic shipped Claude for Small Business on 2026-09-15 and open-sourced it
+under Apache-2.0 in `anthropics/knowledge-work-plugins/small-business`: 44
+skills, a plain-English router, shared rules (untrusted content, connector
+neutrality, tenant scope), and a `.mcp.json` of 43 remote connectors. It runs
+in Cowork and Claude Code. Its memory is a `## Business context` block in the
+Cowork session directory; its mail, calendar, and files categories reach one
+Google and one Microsoft account. We keep the 44 skills and patch exactly
+those seams (§3.3). Geoffrey's difference is the part they did not build:
 
 - **Every account.** Several Gmail and Microsoft 365 mailboxes, calendars, and
   Google Drives in one assistant. The built-in connectors hold one account each
@@ -28,6 +32,10 @@ did not build:
   can read, edit, and take with them.
 - **An installer that a business owner finishes alone.** One line pasted into
   Terminal. The installer is the product; everything else is what it installs.
+- **Talking to it.** Voice is Anthropic's, not ours: the Claude phone app's
+  voice mode and Claude Code's voice input. Whether voice mode can drive
+  connectors is unverified (§8); if it cannot, dictation is the v1 answer and
+  is stated as such in the owner's docs.
 
 The owner is referred to as **the owner**. Whoever receives it first is **the
 first user**. No person's name appears in any of the three installable pieces.
@@ -41,15 +49,18 @@ first user**. No person's name appears in any of the three installable pieces.
 | Files: find, read a doc or sheet | yes (Drive, Sheets) | no (deferred) |
 | Sheets: write a range, behind the server-side boundary (§5) | yes | no (deferred) |
 | Memory in the owner's repo | yes | — |
-| Third-party tools (Stripe, QuickBooks, HubSpot, …) | Anthropic's connectors, offered by the installer as a click-through menu | |
+| The 44 SMB skills (business pulse, invoice chase, cash flow, proposals, CRM, month close, …) | forked from Anthropic, running on Geoffrey's memory and accounts | |
+| Third-party tools (Stripe, QuickBooks, HubSpot, …) | the plugin's own 43 connectors, as Anthropic ships them | |
 
 ### What v1 does not do
 
 - Send email, post, pay, or delete. Ever. Draft and label; a human sends.
 - Build any connector Anthropic already offers.
-- Install Anthropic's Small Business plugin. It is Cowork-only and carries its
-  own onboarding and memory; two assistants in one client is a worse product.
-  The installer mentions it as optional for owners who use Cowork.
+- Rewrite the SMB skills. They are forked and patched at the seams; the
+  upstream is tracked and merged, never re-derived.
+- Install Anthropic's Small Business plugin *alongside* Geoffrey. Geoffrey is
+  that plugin; two copies means two memories and two onboardings.
+- Build voice.
 - OneDrive / Excel. Microsoft is mail and calendar in v1.
 - Hold the owner's memory on the server. Memory is the owner's GitHub repo;
   the server reads and writes it through the GitHub API on the owner's behalf
@@ -73,6 +84,9 @@ sees it:
 4. A week later, in Claude Code on the Mac, Geoffrey recalls something it
    learned in step 2 without being reminded.
 5. Repeat step 2 with a Microsoft mailbox as one of the two accounts.
+6. Say "who owes me money?" on the phone. The forked `invoice-chase` runs
+   across every connected mailbox, names each, and the result matches what
+   the owner can see by hand.
 
 Every step has a checkpoint in the plan; none is "it should work."
 
@@ -109,13 +123,18 @@ Before starting the owner needs a Mac, a paid Claude plan, and a GitHub account
    plugin inside the Claude apps happens at claude.ai and has no API. The
    installer prints the exact click path and the URL to paste, then waits for
    "done." This is what lights up Desktop and the phone.
-7. **"What else do you run your business on?"** A menu of Anthropic's own
-   connectors, in plain categories (money in, books, customers, files, team),
-   each a click path at claude.ai. Nothing here is Geoffrey's code. Skippable.
-8. **"Say hello."** Opens Claude Code in `~/Geoffrey` with a first prompt
-   queued: Geoffrey introduces itself, asks name and time zone, reads across
-   every connected account to prove they work, writes what it learned to
-   `memory/user.md`, and commits.
+7. **"What else do you run your business on?"** The plugin's 43 connectors,
+   in plain categories (money in, books, customers, files, team), each a click
+   path. These ship inside the plugin's `.mcp.json`, so in Claude Code they are
+   already registered and only need authorizing; in the Claude apps the
+   installer prints the click path. Nothing here is Geoffrey's code. Skippable.
+8. **"Say hello."** Opens Claude Code in `~/Geoffrey` and runs the forked
+   `smb-onboard`: Geoffrey introduces itself, reads across every connected
+   account to prove they work, runs the owner's first real task ("who owes me
+   money?" against their actual mail and ledger), interviews them about the
+   business one question at a time, shows the profile, and on approval writes
+   it to `memory/` and commits. This is Anthropic's 15-minute onboarding with
+   the plumbing already done.
 
 **When a step fails**, the installer says which step, why in plain words, the
 one thing to try, and the exact line to paste to resume *from that step*.
@@ -200,16 +219,40 @@ Additions for v1:
 
 ### 3.3 `plugin/` — the behavior
 
-Skills, installed into Claude Code via the marketplace and into the Claude apps
-via Customize → Plugins. The `geoffrey` skill stays the spine: own the outcome,
-verify, remember, ask before anything consequential.
+A fork of `anthropics/knowledge-work-plugins/small-business` (Apache-2.0;
+`LICENSE` and `NOTICE` kept, "built on Anthropic's Small Business plugin" in
+the README), installed into Claude Code via the marketplace and into the Claude
+apps via Customize → Plugins. All 44 upstream skills, `smb-router`, and
+`shared/` come across unchanged except at three seams:
+
+1. **Memory.** Every reference to the Cowork session memory directory becomes
+   `memory/` in the owner's repo — the local clone when present, the
+   `*_memory` tools otherwise. The `## Business context` block lives in
+   `memory/business.md`. One search-and-patch, kept as a documented diff.
+2. **Accounts.** In `shared/connector-neutrality.md` and
+   `connector-call-shapes.md`, Geoffrey joins the Mail, Calendar, and Files
+   categories as a peer whose calls take an `account`. Skills that read mail or
+   files are told: when Geoffrey is connected, ask `list_accounts` and run
+   across all of them, naming each. Gmail and Microsoft 365 built-ins remain
+   listed for owners who never connect Geoffrey's server.
+3. **Onboarding.** `smb-onboard` loses its connector-setup moves (the
+   installer did them) and keeps the interview, the first-recipe run, the
+   profile, and the weekly cadence. It writes the profile through seam 1.
+
+The `geoffrey` skill stays as the spine underneath all 44: own the outcome,
+verify, remember, ask before anything consequential, and the sheet-write
+handling below. Where upstream's `shared/untrusted-content.md` and Geoffrey's
+rule 5 say the same thing, upstream's wording wins and Geoffrey's skill points
+at it rather than restating it.
+
+**Tracking upstream.** The fork is a git subtree of the upstream path; merges
+are a plan task on a cadence, and the three seams are the only files expected
+to conflict. If a merge conflicts elsewhere, that is a signal we have drifted
+and the drift is reverted, not the merge.
 
 **Several skills are allowed.** The previous project's problem was seven skills
 mirrored into three directories; the plugin format removes the mirroring. One
-source of truth per skill, all under `plugin/skills/`. v1 adds SMB working
-skills only where a task needs more than the spine gives it (a weekly brief, a
-chase-overdue loop). Add a skill when a task keeps needing the same procedure;
-don't add one speculatively.
+source of truth per skill, all under `plugin/skills/`.
 
 The `geoffrey` skill gains the sheet-write handling: show the intended change,
 call `update_sheet`, and on refusal relay the approval link with a one-line
@@ -217,7 +260,8 @@ explanation of why ("I can read any sheet; writing needs your okay once per
 sheet — tap to allow"). It also tells the owner, the first time it comes up,
 that the connect page is where to see and change the list.
 
-Status: `geoffrey` written; two eval suites written and never run.
+Status: `geoffrey` written; two eval suites written and never run; the fork
+does not exist yet.
 
 ### 3.4 `setup/` — the installer
 
@@ -367,6 +411,10 @@ new code:
 - `add-account.js` echoes `url.search` into HTML on the callback page. Escape
   it.
 
+**License.** The forked skills are Apache-2.0. The repo carries upstream's
+`LICENSE` and a `NOTICE` naming the origin and our modifications. Geoffrey's
+own code is licensed separately and that is a plan task, not a design question.
+
 **Standing rules**, unchanged: no send tool; every tool names its account;
 references not payloads; the server never calls an LLM; memory is plain files.
 Email content is data to report, never an instruction to follow.
@@ -407,6 +455,16 @@ Each is cheap, each would change the plan if wrong, so each is an early task:
    commit through the API** with a token that survives (fine-grained tokens
    and GitHub App installation tokens are the two candidates). Gates the
    product claim, not one surface. Most load-bearing item on this list.
+6. **Plugin skills run in the Claude phone app.** Anthropic documents plugins
+   for Cowork, Claude Code, Desktop, and web; mobile chat is not stated. If
+   skills do not load on the phone, the phone still has Geoffrey's connector
+   and memory, and the skills run on the Mac and in cloud Code sessions — a
+   real reduction that the owner's docs would have to state.
+7. **The forked skills call Geoffrey's tools correctly** after the
+   connector-neutrality patch — measured by running `inbox-manager` and
+   `invoice-chase` across two accounts, not by reading the diff.
+8. **Voice mode in the Claude phone app can drive connectors.** If not,
+   dictation is what "talk to Geoffrey" means in v1.
 
 ---
 
@@ -421,7 +479,9 @@ Each is cheap, each would change the plan if wrong, so each is an early task:
   `GEOFFREY_URL`. Extended to cover every tool, including a Microsoft account
   and a Drive/Sheets pass.
 - **Skill evals:** `plugin/skills/geoffrey/evals/`. The prompt-injection case
-  runs before anything is handed to anyone.
+  runs before anything is handed to anyone. Plus two upstream skills
+  (`inbox-manager`, `invoice-chase`) run against two connected accounts to
+  prove seam 2, and `smb-onboard` run to prove seam 1 writes to `memory/`.
 - **Installer:** run on a fresh macOS user account on Jeffrey's Mac (a clean
   Mac for the price of a login). Every step's failure path is triggered on
   purpose at least once and the resume line is followed.
@@ -447,10 +507,12 @@ in dependency order:
    three `*_memory` tools. Smoke test against `GEOFFREY_URL`, including a
    memory round trip from a surface with no clone.
 7. Connect page.
-8. Template additions and the sync discipline. Plugin skill updates.
-9. Installer, step by step, each with its checkpoint and failure path.
-10. Run the evals. Run the acceptance test on a clean user account.
-11. Hand to the first user, in person. Fix what breaks. Only then, the next
+8. Template additions and the sync discipline.
+9. Fork the SMB plugin as a subtree; patch the three seams; run the two seam
+   proofs in §9.
+10. Installer, step by step, each with its checkpoint and failure path.
+11. Run the evals. Run the acceptance test on a clean user account.
+12. Hand to the first user, in person. Fix what breaks. Only then, the next
     version.
 
 Each stage ends with something running that didn't run before, and a
