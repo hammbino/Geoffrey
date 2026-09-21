@@ -166,6 +166,15 @@ owner's memory.
 
 Five pieces in this repo, plus three console prerequisites.
 
+**This repo is public.** A plugin marketplace must be readable by the person
+installing from it, and creating a repo from a template requires the template
+to be visible to the person creating it. So `plugin/` and
+`assistant-template/` cannot ship from a private repo, and splitting them out
+would mean a publishing pipeline. Nothing secret lives here by rule — the
+Google client secret and every token are on the server — and the fork is
+Apache-2.0, which belongs in the open anyway. The archive
+(`hammbino/Geoffrey-archive`) stays private.
+
 ### 3.1 `mcp/` — the server
 
 The capabilities. Hosted on Cloudflare Workers; the same code also runs as a
@@ -173,10 +182,12 @@ stdio process for local development and tests.
 
 - **Identity.** The owner signs into Geoffrey with GitHub. That one identity
   keys their account store, is what Claude authenticates against when the
-  connector is added, and is the same account that owns their memory repo. The
-  GitHub grant is scoped to that one repository, so the server can read and
-  commit memory on the owner's behalf and nothing else. No Geoffrey password
-  exists.
+  connector is added, and is the same account that owns their memory repo.
+  **Geoffrey is a GitHub App**, not an OAuth app: an OAuth app's `repo` grant
+  covers every repository the owner has, while a GitHub App installed on one
+  selected repository can read and commit there and nowhere else, with
+  installation tokens that do not expire with the owner's browser session. No
+  Geoffrey password exists.
 - **Storage.** One Durable Object per owner holding: provider refresh tokens,
   the GitHub token and memory-repo name, the account registry (`id`,
   `provider`, `address`, `purpose`), and the sheet-write allowlist. No memory
@@ -200,9 +211,9 @@ stdio process for local development and tests.
 | `list_labels`, `modify_labels`, `create_draft` | exist |
 | `list_calendars`, `list_events` | exist |
 | `search_files` | Drive: id, name, type, modified. No contents. Refuses an empty query — upstream's "search by name, never browse" enforced in the tool surface, not the prompt. |
-| `get_file` | One file's text: Docs exported as text, Sheets as CSV of a range, others as plain text where Drive can export it. Capped. |
+| `get_file` | One file's text: Docs exported as text, Sheets as CSV of a range, others as plain text where Drive can export it. Capped — small enough that one call cannot flood the context; the number is set in the plan. |
 | `read_sheet` | A range from one sheet, as rows. |
-| `update_sheet` | A range write. Refused unless the sheet is on the owner's allowlist. Returns `{before, after}`. Capped at a fixed number of cells per call. |
+| `update_sheet` | A range write. Refused unless the sheet is on the owner's allowlist. Returns `{before, after}`. Capped at a fixed number of cells per call — small enough that one call cannot clear a sheet; the number is set in the plan. |
 | `list_memory` | Paths under `memory/` in the owner's repo, with sizes. No contents. These tools take no `account`; memory belongs to the owner, not a mailbox. |
 | `read_memory` | One file's text from the repo, at the current head. |
 | `write_memory` | Create or replace one file under `memory/`, committed to the repo with a one-line message. Refuses any path outside `memory/`. Returns the commit sha and the previous contents. |
@@ -252,9 +263,11 @@ apps via Customize → Plugins. All 44 upstream skills, `smb-router`, and
    the Mail, Calendar, and Files categories in `connector-neutrality.md`, gets
    a row in `connector-call-shapes.md` ("every call takes `account`; call
    `list_accounts` first and run across all of them, naming each; **when
-   Geoffrey is connected it is the mail, calendar, and files path — do not
-   also call the Gmail, Google Calendar, Google Drive, or Microsoft 365
-   built-ins, or an inbox is read twice**"), and those two reference files
+   Geoffrey is connected it is the mail and calendar path for every account
+   and the files path for Google accounts — do not also call the Gmail,
+   Google Calendar, or Google Drive built-ins, or an inbox is read twice.
+   Microsoft 365 files stay on the built-in Microsoft 365 connector until
+   Geoffrey serves OneDrive**"), and those two reference files
    gain a Geoffrey paragraph. Upstream's `tenant-scope` check ("is this store
    the owner's?") is satisfied by construction for Geoffrey accounts: the
    owner signed into each one, and `list_accounts` carries the address and
@@ -295,6 +308,17 @@ reconcile — compared rule by rule against upstream at v1.35.1:
   listing-style tool, and it is exempt: memory is Geoffrey's own, not a tenant
   store.
 
+**How the spine is always on.** Upstream's skills load when the router
+triggers them; the `geoffrey` skill is meant to be underneath all of them,
+every time. That needs two mechanisms, one per surface. In Claude Code and
+cloud Code sessions, the spine's rules live in the template's `CLAUDE.md`,
+which is loaded on every turn without a trigger. In the Claude apps there is
+no `CLAUDE.md`, so the `geoffrey` skill's description has to trigger on any
+delegated work, any mailbox or file question, and any memory question — and
+`evals/trigger-evals.json` (20 queries, half near-misses) is the proof that it
+does without hijacking unrelated conversations. The skill and `CLAUDE.md` say
+the same things; `CLAUDE.md` is the copy that cannot fail to load.
+
 **Tracking upstream.** The fork is a git subtree of the upstream path; merges
 are a plan task on a cadence, and the three seams are the only files expected
 to conflict. If a merge conflicts elsewhere, that is a signal we have drifted
@@ -315,10 +339,12 @@ does not exist yet.
 
 ### 3.4 `setup/` — the installer
 
-New. A small bootstrap shell script (fetched by the one line) that ensures
-Node is present, then hands off to a Node CLI that runs §2. Node because a
-resumable, interactive, multi-step wizard is miserable in shell and Claude
-Code's own installer already proves users will paste one line.
+New. A small bootstrap shell script (fetched by the one line) that downloads
+a standalone Node binary into `~/.geoffrey/node/` — no system install, no
+Homebrew, no PATH edits, removable by deleting one folder — then hands off to
+a Node CLI that runs §2. Node because a resumable, interactive, multi-step
+wizard is miserable in shell and Claude Code's own installer already proves
+users will paste one line.
 
 Responsibilities: every step in §2, its checkpoint, its failure message, and
 its resume line. Nothing else — it holds no credentials and calls no provider
@@ -339,7 +365,9 @@ New. A few pages served by the Worker:
 - Every page that touches sheets explains the two ways onto the list in one
   short paragraph: pick them here, or allow one when Geoffrey asks. These two
   pages and the server's refusal message are the only ways onto the allowlist.
-- List connected accounts; remove one.
+- List connected accounts; remove one. Removing revokes the grant at Google
+  or Microsoft as well as deleting the stored token, so it disappears from the
+  owner's own account-permissions page and not only from ours.
 
 The installer opens it in step 4. The owner returns to it later to add an
 account or a sheet without re-running anything.
@@ -350,8 +378,11 @@ account or a sheet without re-running anything.
   `gmail.modify`, `calendar.events`, `drive.readonly`, `spreadsheets`. Not the
   probe project — a clean one. The client secret lives on the server, never in
   the installer.
-- **One Microsoft Entra registration**, multi-tenant plus personal accounts.
-  `docs/outlook-setup.md` is the runbook.
+- **One Microsoft Entra registration**, multi-tenant plus personal accounts,
+  with two platform configurations: the public-client `localhost` redirect
+  `add-account.js` uses for local development, and a web redirect to
+  `GEOFFREY_URL` for the hosted connect page. `docs/outlook-setup.md` is the
+  runbook and gains the second platform.
 - **A domain** for the server and connect page. Referred to below as
   `GEOFFREY_URL`; registering it is a plan task, not a design question.
 
