@@ -194,7 +194,7 @@ stdio process for local development and tests.
 | `search_messages`, `get_message` | exist |
 | `list_labels`, `modify_labels`, `create_draft` | exist |
 | `list_calendars`, `list_events` | exist |
-| `search_files` | Drive: id, name, type, modified. No contents. |
+| `search_files` | Drive: id, name, type, modified. No contents. Refuses an empty query — upstream's "search by name, never browse" enforced in the tool surface, not the prompt. |
 | `get_file` | One file's text: Docs exported as text, Sheets as CSV of a range, others as plain text where Drive can export it. Capped. |
 | `read_sheet` | A range from one sheet, as rows. |
 | `update_sheet` | A range write. Refused unless the sheet is on the owner's allowlist. Returns `{before, after}`. Capped at a fixed number of cells per call. |
@@ -244,8 +244,14 @@ apps via Customize → Plugins. All 44 upstream skills, `smb-router`, and
    `business-pulse/reference/data_sources.md`). So the patch is: Geoffrey joins
    the Mail, Calendar, and Files categories in `connector-neutrality.md`, gets
    a row in `connector-call-shapes.md` ("every call takes `account`; call
-   `list_accounts` first and run across all of them, naming each"), and those
-   two reference files gain a Geoffrey paragraph. Four files. Gmail and
+   `list_accounts` first and run across all of them, naming each; **when
+   Geoffrey is connected it is the mail, calendar, and files path — do not
+   also call the Gmail, Google Calendar, Google Drive, or Microsoft 365
+   built-ins, or an inbox is read twice**"), and those two reference files
+   gain a Geoffrey paragraph. Upstream's `tenant-scope` check ("is this store
+   the owner's?") is satisfied by construction for Geoffrey accounts: the
+   owner signed into each one, and `list_accounts` carries the address and
+   purpose. Four files. Gmail and
    Microsoft 365 built-ins stay listed for owners who never connect Geoffrey's
    server. Whether four files is enough is proven by running skills (§9), not
    by reading the diff.
@@ -255,9 +261,32 @@ apps via Customize → Plugins. All 44 upstream skills, `smb-router`, and
 
 The `geoffrey` skill stays as the spine underneath all 44: own the outcome,
 verify, remember, ask before anything consequential, and the sheet-write
-handling below. Where upstream's `shared/untrusted-content.md` and Geoffrey's
-rule 5 say the same thing, upstream's wording wins and Geoffrey's skill points
-at it rather than restating it.
+handling below. Where the two sets of rules overlap, this is how they
+reconcile — compared rule by rule against upstream at v1.35.1:
+
+- **Untrusted content.** Same rule. Upstream's `shared/untrusted-content.md`
+  is fuller ("money, credential, and identity asks are held, always");
+  Geoffrey's skill points at it rather than restating it.
+- **Memory has two write rules.** The business profile
+  (`memory/business.md`, upstream's `## Business context`) follows upstream:
+  show the owner the full profile before writing, never overwrite silently,
+  update only what changed. Working memory — `people/`, `projects/`,
+  `waiting/`, `decisions/`, `journal/` — follows Geoffrey: write as work
+  happens, mark confirmed / inferred / tentative. The skill names the split.
+- **Personal data.** Upstream's `shared/personal-data.md` is broader than
+  Geoffrey's "no passwords or tokens" and is adopted whole: SSNs, dates of
+  birth, home addresses, full card and bank numbers are never reproduced in
+  any output — and, added for Geoffrey, **never written to `memory/`**. The
+  repo is the owner's, but it is also a plain-text file on several machines.
+- **Absent is not zero.** Upstream's `shared/absent-is-not-zero.md` has no
+  Geoffrey equivalent and is adopted whole. Applied to Geoffrey's own tools:
+  an empty `search_messages` or `search_files` result is reported with the
+  accounts and query that produced it, never as "there are none"; a
+  multi-account run that failed on one account says which, rather than
+  folding the failure into a smaller total.
+- **Files.** Upstream's "search by name, never browse" is enforced by
+  `search_files` refusing an empty query (§3.1), and by `read_memory` being
+  the only listing-style tool — memory is Geoffrey's own, not a tenant store.
 
 **Tracking upstream.** The fork is a git subtree of the upstream path; merges
 are a plan task on a cadence, and the three seams are the only files expected
@@ -497,7 +526,7 @@ Each is cheap, each would change the plan if wrong, so each is an early task:
 - **Unit:** the sheet-write allowlist (refuses unlisted with a signed link,
   rejects tampered or expired links, allows listed, returns before/after, caps
   cells), `write_memory` path confinement and stale-head
-  refusal, OData escaping, `account` validation on every mailbox tool. Fast,
+  refusal, `search_files` refusing an empty query, OData escaping, `account` validation on every mailbox tool. Fast,
   no network.
 - **Smoke:** `mcp/smoke-test.mjs` against the stdio server and against
   `GEOFFREY_URL`. Extended to cover every tool, including a Microsoft account
