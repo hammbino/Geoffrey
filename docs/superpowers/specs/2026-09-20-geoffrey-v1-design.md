@@ -590,9 +590,13 @@ in dependency order:
 
 1. Harden the moved server (§7 findings). Run the existing smoke test.
 2. Console prerequisites: Google client, Entra registration, `GEOFFREY_URL`.
+   **Jeffrey's alone, and started on day one** — in parallel with stages 1
+   through 5, so that stages 6 and 7 are never waiting on a console form.
 3. Verify the eight assumptions in §8.
 4. Prove Microsoft locally: connect a real mailbox via `add-account.js`, extend
-   the smoke test.
+   the smoke test. The mailbox is a free outlook.com account created for the
+   purpose, unless Jeffrey supplies a Microsoft 365 one; Jeffrey's own
+   accounts are both Google, and acceptance step 5 needs Microsoft.
 5. Drive and Sheets locally: `search_files`, `get_file`, `read_sheet`,
    `update_sheet` with the allowlist, unit-tested.
 6. Host: Worker, per-owner Durable Object, GitHub identity, Claude OAuth, the
