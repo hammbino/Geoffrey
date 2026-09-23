@@ -3,7 +3,7 @@
 **Run these before deciding the build order.** Six questions, all answerable in
 one day with what exists today. Five of the eight assumptions in the v1 spec
 (`docs/superpowers/specs/2026-09-20-geoffrey-v1-design.md`, §8) are phone or
-identity questions, and every one of them changes what gets built — one of them
+identity questions, and every one of them changes what gets built. One of them
 could remove half the work from v1.
 
 Each spike says what to do, what you should see, and what the answer changes.
@@ -15,7 +15,7 @@ independent and can be done any time.
 
 ---
 
-## Spike 1 — A hello-world MCP server on a public URL
+## Spike 1. A hello-world MCP server on a public URL
 
 **Question:** can we put an MCP server on a URL that Anthropic's cloud can
 reach? Everything about the hosted design assumes yes, and nothing has been
@@ -34,7 +34,7 @@ those three cannot be run at all.
 
    A browser opens; authorize the Cloudflare account.
 
-2. Create the spike in the scratch area (this is throwaway code — it does not
+2. Create the spike in the scratch area (this is throwaway code. It does not
    belong in the repo):
 
    ```bash
@@ -59,7 +59,7 @@ those three cannot be run at all.
          "Returns a greeting and the name you pass it. Used to prove this server is reachable.",
          { name: z.string().describe("Any name") },
          async ({ name }) => ({
-           content: [{ type: "text", text: `hi ${name} — reached the spike server at ${new Date().toISOString()}` }],
+           content: [{ type: "text", text: `hi ${name}, reached the spike server at ${new Date().toISOString()}` }],
          })
        );
      }
@@ -90,7 +90,7 @@ those three cannot be run at all.
    ```
 
 **You should see:** a deployed URL like
-`https://geoffrey-spike.<subdomain>.workers.dev`. Write it down — the next
+`https://geoffrey-spike.<subdomain>.workers.dev`. Write it down, the next
 three spikes need it. The MCP endpoint is that URL plus `/sse`.
 
 **Check it before moving on:**
@@ -112,7 +112,7 @@ depends on this and there is no point running spikes 2–4 without it.
 
 ---
 
-## Spike 2 — Does phone *chat* reach a custom connector?
+## Spike 2. Does phone *chat* reach a custom connector?
 
 **Question:** in ordinary Claude chat on the phone, will the model call a tool
 on a custom connector?
@@ -132,8 +132,8 @@ v1 leaves the critical path.
 5. Now open the **Claude app on the phone**. New chat. Say the same thing.
 
 **You should see:** on the phone, a tool call to `hi` and a reply containing
-`hi Jeffrey — reached the spike server at <timestamp>`. The timestamp proves it
-reached the server rather than inventing a plausible answer — check that it is
+`hi Jeffrey, reached the spike server at <timestamp>`. The timestamp proves it
+reached the server rather than inventing a plausible answer, check that it is
 today's date and close to now.
 
 **Also note:** whether the connector needed re-authorizing on the phone, and
@@ -157,10 +157,10 @@ picker. That detail goes into the installer's step 6 instructions.
 
 ---
 
-## Spike 3 — Can a cloud Code session reach a remote MCP server?
+## Spike 3. Can a cloud Code session reach a remote MCP server?
 
 **Question:** a Claude Code session running in Anthropic's cloud (the **Code**
-tab on the phone) — can it call a remote MCP server?
+tab on the phone), can it call a remote MCP server?
 
 **Why it matters:** the design says the phone's Code tab gets memory from the
 repo and accounts from the connector. Only the memory half has ever been
@@ -193,7 +193,7 @@ timestamp.
 
 **If the tool is not listed:** ask the session to run `claude mcp list` and
 report the output verbatim. That distinguishes "not configured" from
-"configured but unreachable" — two very different answers.
+"configured but unreachable". Two very different answers.
 
 **What the answer changes:**
 
@@ -210,7 +210,7 @@ report the output verbatim. That distinguishes "not configured" from
 
 ---
 
-## Spike 4 — Can voice mode drive a connector?
+## Spike 4. Can voice mode drive a connector?
 
 **Question:** in the Claude phone app's voice mode, does asking for a tool
 actually call it?
@@ -226,7 +226,7 @@ Voice is Anthropic's, not ours, so this is a find-out, not a build.
 
 **You should see (or hear):** the assistant calling the tool and reading back
 the greeting with the timestamp. Note whether the transcript shows a tool call
-or whether it only *describes* calling one — a spoken "I'll check that for you"
+or whether it only *describes* calling one. A spoken "I'll check that for you"
 with no tool call is a failure, not a success.
 
 **What the answer changes:**
@@ -242,7 +242,7 @@ with no tool call is a failure, not a success.
 
 ---
 
-## Spike 5 — Do plugin skills load on the phone?
+## Spike 5. Do plugin skills load on the phone?
 
 **Question:** does a skill from an installed plugin fire in Claude chat on the
 phone?
@@ -259,7 +259,7 @@ discovered by the first user.
    2026-09-21). If installing from a marketplace URL is not offered, upload the
    `plugin/` directory as a plugin.
 2. Confirm on the computer first: in a new chat, say *"What is on my plate?"*
-   and check that Geoffrey's behavior appears — it should talk about naming the
+   and check that Geoffrey's behavior appears. It should talk about naming the
    outcome and checking authority, not answer generically.
 3. On the **phone**, new chat, same question.
 
@@ -283,15 +283,15 @@ available?"* on both surfaces and compare the lists.
 
 ---
 
-## Spike 6 — Can a GitHub App commit to one repo with a durable token?
+## Spike 6. Can a GitHub App commit to one repo with a durable token?
 
 **Question:** can a GitHub App, installed on a single repository, read and
-commit there through the API — with a token that does not die when the owner's
+commit there through the API, with a token that does not die when the owner's
 browser session does?
 
 **Why it matters:** this is how memory works on every surface that has no local
 clone (Desktop, phone chat). It is the most load-bearing assumption in the
-spec, and it is independent of the phone — run it whenever.
+spec, and it is independent of the phone, run it whenever.
 
 **Do this:**
 
@@ -361,7 +361,7 @@ spec, and it is independent of the phone — run it whenever.
    ```
 
 **You should see:** an `expires_at` roughly one hour out, then `201` (or `200`
-on a re-run) and a commit visible in the repo. Run it **twice** — the second
+on a re-run) and a commit visible in the repo. Run it **twice**, the second
 run exercises the "file exists, sha required" path, which is what every real
 memory write after the first one does.
 
@@ -404,5 +404,5 @@ what gets built. Spike 6 gates plan 2 regardless of the phone answers.
 
 **Clean up when done:** `npx wrangler delete` the spike Worker, remove the
 Spike connector at claude.ai, uninstall the GitHub App, and delete
-`~/geoffrey-spike`. The spike code is throwaway by design — nothing here moves
+`~/geoffrey-spike`. The spike code is throwaway by design. Nothing here moves
 into the repo.

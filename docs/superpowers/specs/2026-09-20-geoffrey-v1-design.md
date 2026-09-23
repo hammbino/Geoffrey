@@ -1,4 +1,4 @@
-# Geoffrey v1 — design
+# Geoffrey v1, design
 
 Written 2026-09-20 from a brainstorm that ran 2026-09-15 through 2026-09-20;
 revised through 2026-09-21 (the fork of Anthropic's Small Business plugin and
@@ -13,7 +13,7 @@ where they disagree with this document, this document wins.
 
 **Geoffrey is Anthropic's Small Business plugin, forked, with the three
 things it lacks: memory the owner owns, every one of the owner's accounts, and
-an installer a business owner finishes alone — on every Claude surface.**
+an installer a business owner finishes alone, on every Claude surface.**
 
 Anthropic shipped Claude for Small Business on 2026-09-15 and open-sourced it
 under Apache-2.0 in `anthropics/knowledge-work-plugins/small-business`: 44
@@ -61,7 +61,7 @@ first user**. No person's name appears in any of the three installable pieces.
   `invoice-chase`, `hiring-screener` are draft-only), for payroll (`run_payroll`
   is never called), and for payments (`pay-the-bills` *stages* a run behind two
   approvals; nothing auto-pays). Writes to a ledger or CRM through a connector
-  we do not own are gated by upstream's approval prompts — a prompt-level gate,
+  we do not own are gated by upstream's approval prompts. A prompt-level gate,
   accepted as such because there is no tool surface of ours to put a boundary
   in. §5 states this distinction.
 - Build any connector Anthropic already offers.
@@ -86,13 +86,13 @@ sees it:
 2. From the phone, in ordinary Claude chat: ask Geoffrey to compare a value in
    a sheet held in one Google account against an email in a different account.
    Geoffrey answers correctly and names both accounts.
-3. Ask Geoffrey to update that sheet — one that was *not* selected during
+3. Ask Geoffrey to update that sheet. One that was *not* selected during
    setup. Geoffrey shows the intended change, is refused, relays the approval
    link; the owner taps Allow on the phone; Geoffrey retries, the write lands,
    and shows before and after.
 4. A week later, in Claude Code on the Mac, Geoffrey recalls, unprompted,
    something written to memory during onboarding (§2 step 8) or during steps
-   2–3 — which sheet is allowed, which account holds what.
+   2–3. Which sheet is allowed, which account holds what.
 5. Repeat step 2 with a Microsoft mailbox as one of the two accounts.
 6. Say "who owes me money?" on the phone. The forked `invoice-chase` runs
    across every connected mailbox, names each, and the result matches what
@@ -111,18 +111,18 @@ Before starting the owner needs a Mac, a paid Claude plan, and a GitHub account
    plain English, one step at a time, and never moves on until the step it just
    did provably worked.
 2. **"Let's get Claude on this Mac."** Installs Claude Code if missing. Opens
-   the browser; the owner signs into Claude themselves — Anthropic's terms
+   the browser; the owner signs into Claude themselves, Anthropic's terms
    require it. Checkpoint: `claude` answers a trivial prompt.
 3. **"A private home for what Geoffrey remembers."** Opens GitHub; the owner
    clicks Authorize. Creates their private `geoffrey-<name>` repo from the
    template, clones it to `~/Geoffrey`. Checkpoint: the clone exists and
    `memory/README.md` is readable.
 4. **"Connect your accounts."** Opens the Geoffrey connect page. The owner
-   signs into a Google account, then is asked *"another one?"* — Microsoft,
+   signs into a Google account, then is asked *"another one?"*, Microsoft,
    another Google, until they say done. Each grant is verified with a live read
    of the inbox before it is saved. For each Google account the page then lists
    their spreadsheets and asks which ones Geoffrey may **write** to, so they
-   can start day one — and says, right there, that reading needs no permission
+   can start day one. And says, right there, that reading needs no permission
    and that any other sheet can be allowed later with one tap when Geoffrey
    first needs it (§5). Skippable. Checkpoint: the server reports every
    account readable.
@@ -170,12 +170,12 @@ Five pieces in this repo, plus three console prerequisites.
 installing from it, and creating a repo from a template requires the template
 to be visible to the person creating it. So `plugin/` and
 `assistant-template/` cannot ship from a private repo, and splitting them out
-would mean a publishing pipeline. Nothing secret lives here by rule — the
-Google client secret and every token are on the server — and the fork is
+would mean a publishing pipeline. Nothing secret lives here by rule, the
+Google client secret and every token are on the server. And the fork is
 Apache-2.0, which belongs in the open anyway. The archive
 (`hammbino/Geoffrey-archive`) stays private.
 
-### 3.1 `mcp/` — the server
+### 3.1 `mcp/`, the server
 
 The capabilities. Hosted on Cloudflare Workers; the same code also runs as a
 stdio process for local development and tests.
@@ -192,7 +192,7 @@ stdio process for local development and tests.
   the GitHub token and memory-repo name, the account registry (`id`,
   `provider`, `address`, `purpose`), and the sheet-write allowlist. No memory
   content is stored on the server; it is fetched from the repo per call.
-  Isolation per owner is structural — there is no shared table to mis-filter.
+  Isolation per owner is structural. There is no shared table to mis-filter.
 - **Claude ↔ Geoffrey auth.** OAuth via the Cloudflare Agents SDK provider,
   with GitHub as the upstream identity.
 - **Owner ↔ provider auth.** Google and Microsoft OAuth, browser-based, on the
@@ -202,7 +202,7 @@ stdio process for local development and tests.
   `~/.geoffrey/accounts.json`. `store.js` becomes the interface both implement
   so providers and tools never know which one they are on.
 - **Tools.** Every mailbox, calendar, and file tool takes `account`. Omitting
-  it is a validation error. The memory tools take none — see the table.
+  it is a validation error. The memory tools take none, see the table.
 
 | Tool | Notes |
 |---|---|
@@ -210,10 +210,10 @@ stdio process for local development and tests.
 | `search_messages`, `get_message` | exist |
 | `list_labels`, `modify_labels`, `create_draft` | exist |
 | `list_calendars`, `list_events` | exist |
-| `search_files` | Drive: id, name, type, modified. No contents. Refuses an empty query — upstream's "search by name, never browse" enforced in the tool surface, not the prompt. |
-| `get_file` | One file's text: Docs exported as text, Sheets as CSV of a range, others as plain text where Drive can export it. Capped — small enough that one call cannot flood the context; the number is set in the plan. |
+| `search_files` | Drive: id, name, type, modified. No contents. Refuses an empty query: upstream's "search by name, never browse" enforced in the tool surface, not the prompt. |
+| `get_file` | One file's text: Docs exported as text, Sheets as CSV of a range, others as plain text where Drive can export it. Capped small enough that one call cannot flood the context; the number is set in the plan. |
 | `read_sheet` | A range from one sheet, as rows. |
-| `update_sheet` | A range write. Refused unless the sheet is on the owner's allowlist. Returns `{before, after}`. Capped at a fixed number of cells per call — small enough that one call cannot clear a sheet; the number is set in the plan. |
+| `update_sheet` | A range write. Refused unless the sheet is on the owner's allowlist. Returns `{before, after}`. Capped at a fixed number of cells per call, small enough that one call cannot clear a sheet; the number is set in the plan. |
 | `list_memory` | Paths under `memory/` in the owner's repo, with sizes. No contents. These tools take no `account`; memory belongs to the owner, not a mailbox. |
 | `read_memory` | One file's text from the repo, at the current head. |
 | `write_memory` | Create or replace one file under `memory/`, committed to the repo with a one-line message. Refuses any path outside `memory/`. Returns the commit sha and the previous contents. |
@@ -225,14 +225,14 @@ writes outside `memory/`.
   Google. Microsoft provider is written, never run against a real mailbox. Drive
   and Sheets are new. Hosting, identity, and per-owner storage are new.
 
-### 3.2 `assistant-template/` — the owner's repo
+### 3.2 `assistant-template/`. The owner's repo
 
 `CLAUDE.md` and `memory/` in plain markdown. Cloned as a private GitHub repo
 per owner. Every surface reads the same files.
 
 Additions for v1:
 
-- `memory/accounts.md` — which accounts and connectors are attached, and what
+- `memory/accounts.md`. Which accounts and connectors are attached, and what
   each is for, in the owner's words. Written during "say hello" and kept
   current by Geoffrey. This is how Geoffrey knows it has Stripe and what to
   reach for it for. It is deliberately separate from `memory/business.md`
@@ -242,7 +242,7 @@ Additions for v1:
 - `CLAUDE.md` tells Geoffrey which memory path it is on: the local clone when
   the folder is present, the `*_memory` tools otherwise. Same files either way.
 
-### 3.3 `plugin/` — the behavior
+### 3.3 `plugin/`, the behavior
 
 A fork of `anthropics/knowledge-work-plugins/small-business` (Apache-2.0;
 `LICENSE` and `NOTICE` kept, "built on Anthropic's Small Business plugin" in
@@ -251,7 +251,7 @@ apps via Customize → Plugins. All 44 upstream skills, `smb-router`, and
 `shared/` come across unchanged except at three seams:
 
 1. **Memory.** Every reference to the Cowork session memory directory becomes
-   `memory/` in the owner's repo — the local clone when present, the
+   `memory/` in the owner's repo. The local clone when present, the
    `*_memory` tools otherwise. The `## Business context` block lives in
    `memory/business.md`. One search-and-patch, kept as a documented diff.
 2. **Accounts.** Upstream skills name mail, calendar, and files by
@@ -264,7 +264,7 @@ apps via Customize → Plugins. All 44 upstream skills, `smb-router`, and
    a row in `connector-call-shapes.md` ("every call takes `account`; call
    `list_accounts` first and run across all of them, naming each; **when
    Geoffrey is connected it is the mail and calendar path for every account
-   and the files path for Google accounts — do not also call the Gmail,
+   and the files path for Google accounts, do not also call the Gmail,
    Google Calendar, or Google Drive built-ins, or an inbox is read twice.
    Microsoft 365 files stay on the built-in Microsoft 365 connector until
    Geoffrey serves OneDrive**"), and those two reference files
@@ -281,7 +281,7 @@ apps via Customize → Plugins. All 44 upstream skills, `smb-router`, and
 The `geoffrey` skill stays as the spine underneath all 44: own the outcome,
 verify, remember, ask before anything consequential, and the sheet-write
 handling below. Where the two sets of rules overlap, this is how they
-reconcile — compared rule by rule against upstream at v1.35.1:
+reconcile, compared rule by rule against upstream at v1.35.1:
 
 - **Untrusted content.** Same rule. Upstream's `shared/untrusted-content.md`
   is fuller ("money, credential, and identity asks are held, always");
@@ -289,13 +289,13 @@ reconcile — compared rule by rule against upstream at v1.35.1:
 - **Memory has two write rules.** The business profile
   (`memory/business.md`, upstream's `## Business context`) follows upstream:
   show the owner the full profile before writing, never overwrite silently,
-  update only what changed. Working memory — `people/`, `projects/`,
-  `waiting/`, `decisions/`, `journal/` — follows Geoffrey: write as work
+  update only what changed. Working memory, `people/`, `projects/`,
+  `waiting/`, `decisions/`, `journal/`, follows Geoffrey: write as work
   happens, mark confirmed / inferred / tentative. The skill names the split.
 - **Personal data.** Upstream's `shared/personal-data.md` is broader than
   Geoffrey's "no passwords or tokens" and is adopted whole: SSNs, dates of
   birth, home addresses, full card and bank numbers are never reproduced in
-  any output — and, added for Geoffrey, **never written to `memory/`**. The
+  any output. And, added for Geoffrey, **never written to `memory/`**. The
   repo is the owner's, but it is also a plain-text file on several machines.
 - **Absent is not zero.** Upstream's `shared/absent-is-not-zero.md` has no
   Geoffrey equivalent and is adopted whole. Applied to Geoffrey's own tools:
@@ -314,7 +314,7 @@ every time. That needs two mechanisms, one per surface. In Claude Code and
 cloud Code sessions, the spine's rules live in the template's `CLAUDE.md`,
 which is loaded on every turn without a trigger. In the Claude apps there is
 no `CLAUDE.md`, so the `geoffrey` skill's description has to trigger on any
-delegated work, any mailbox or file question, and any memory question — and
+delegated work, any mailbox or file question, and any memory question, and
 `evals/trigger-evals.json` (20 queries, half near-misses) is the proof that it
 does without hijacking unrelated conversations. The skill and `CLAUDE.md` say
 the same things; `CLAUDE.md` is the copy that cannot fail to load.
@@ -331,26 +331,26 @@ source of truth per skill, all under `plugin/skills/`.
 The `geoffrey` skill gains the sheet-write handling: show the intended change,
 call `update_sheet`, and on refusal relay the approval link with a one-line
 explanation of why ("I can read any sheet; writing needs your okay once per
-sheet — tap to allow"). It also tells the owner, the first time it comes up,
+sheet, tap to allow"). It also tells the owner, the first time it comes up,
 that the connect page is where to see and change the list.
 
 Status: `geoffrey` written; two eval suites written and never run; the fork
 does not exist yet.
 
-### 3.4 `setup/` — the installer
+### 3.4 `setup/`, the installer
 
 New. A small bootstrap shell script (fetched by the one line) that downloads
-a standalone Node binary into `~/.geoffrey/node/` — no system install, no
-Homebrew, no PATH edits, removable by deleting one folder — then hands off to
+a standalone Node binary into `~/.geoffrey/node/`. No system install, no
+Homebrew, no PATH edits, removable by deleting one folder, then hands off to
 a Node CLI that runs §2. Node because a resumable, interactive, multi-step
 wizard is miserable in shell and Claude Code's own installer already proves
 users will paste one line.
 
 Responsibilities: every step in §2, its checkpoint, its failure message, and
-its resume line. Nothing else — it holds no credentials and calls no provider
+its resume line. Nothing else. It holds no credentials and calls no provider
 API directly; the connect page does that.
 
-### 3.5 The connect page — on the server
+### 3.5 The connect page, on the server
 
 New. A few pages served by the Worker:
 
@@ -376,7 +376,7 @@ account or a sheet without re-running anything.
 
 - **One Google OAuth client**, External, In Production, unverified. Scopes:
   `gmail.modify`, `calendar.readonly`, `drive.readonly`, `spreadsheets`. Not the
-  probe project — a clean one. The client secret lives on the server, never in
+  probe project. A clean one. The client secret lives on the server, never in
   the installer.
 - **One Microsoft Entra registration**, multi-tenant plus personal accounts,
   with two platform configurations: the public-client `localhost` redirect
@@ -436,11 +436,11 @@ context window. So the boundary is enforced by the server:
    approval before calling, and shows the result after. The skill rule is
    courtesy; the allowlist is the boundary.
 4. **Bounded.** A fixed cap on cells per call; no sheet-wide clears; no
-   formula injection — values are written as values.
+   formula injection, values are written as values.
 
 `write_memory` is a write tool and follows the same reasoning: it is confined
 to `memory/` in one repository the owner chose in their browser, returns the
-previous contents, and is one commit — reversible by design. Email-sourced
+previous contents, and is one commit, reversible by design. Email-sourced
 text can pollute memory; it cannot reach anything else through it. The
 `geoffrey` skill's rule to mark inferences as such is the courtesy layer on top.
 
@@ -451,8 +451,8 @@ question, "recurrence is not consent," and `shared/untrusted-content.md`. That
 is a prompt-level gate and the spec says so plainly rather than pretending
 otherwise. It is the same gate Anthropic ships to every Small Business user;
 Geoffrey does not weaken it and does not claim to strengthen it. What Geoffrey
-*can* fence — its own mail, calendar, files, sheets, and memory — it fences in
-the tool surface.
+can fence, it fences in the tool surface: its own mail, calendar, files,
+sheets, and memory.
 
 The same pattern is how any future write tool (calendar event creation,
 OneDrive) earns its way in: a server-side allowlist or scope the owner set in a
@@ -482,7 +482,7 @@ Small files help: one fact per file in `people/`, `projects/`, `decisions/`,
 `waiting/` means two surfaces rarely touch the same file.
 
 Surfaces without a clone use the `*_memory` tools. Each `write_memory` is one
-commit against the repo's current head, so it cannot produce a conflict — if
+commit against the repo's current head, so it cannot produce a conflict, if
 the head moved since `read_memory`, the server returns the newer contents and
 the tool call fails; Geoffrey re-reads and writes again. The `before` contents
 come back with every write so a mistaken overwrite is one call from restored.
@@ -533,7 +533,7 @@ before the client is configured.
 ## 8. Assumptions to verify first
 
 Each is cheap, each would change the plan if wrong, so each is an early task.
-**These are run first, as spikes, before the build order is fixed** — see
+**These are run first, as spikes, before the build order is fixed**, see
 `docs/superpowers/spikes/2026-09-22-phone-and-identity-spikes.md`, which turns
 items 1, 2, 5, 6, and 8 into six runnable probes with a decision table at the
 end. Items 3 and 4 are checked during the build.
@@ -554,10 +554,10 @@ end. Items 3 and 4 are checked during the build.
 6. **Plugin skills run in the Claude phone app.** Anthropic documents plugins
    for Cowork, Claude Code, Desktop, and web; mobile chat is not stated. If
    skills do not load on the phone, the phone still has Geoffrey's connector
-   and memory, and the skills run on the Mac and in cloud Code sessions — a
+   and memory, and the skills run on the Mac and in cloud Code sessions, a
    real reduction that the owner's docs would have to state.
 7. **The forked skills call Geoffrey's tools correctly** after the
-   connector-neutrality patch — measured by running `inbox-manager` and
+   connector-neutrality patch, measured by running `inbox-manager` and
    `invoice-chase` across two accounts, not by reading the diff.
 8. **Voice mode in the Claude phone app can drive connectors.** If not,
    dictation is what "talk to Geoffrey" means in v1.
@@ -594,7 +594,7 @@ in dependency order:
 
 1. Harden the moved server (§7 findings). Run the existing smoke test.
 2. Console prerequisites: Google client, Entra registration, `GEOFFREY_URL`.
-   **Jeffrey's alone, and started on day one** — in parallel with stages 1
+   **Jeffrey's alone, and started on day one**, in parallel with stages 1
    through 5, so that stages 6 and 7 are never waiting on a console form.
 3. Verify the eight assumptions in §8.
 4. Prove Microsoft locally: connect a real mailbox via `add-account.js`, extend
