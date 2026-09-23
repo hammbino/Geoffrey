@@ -375,7 +375,7 @@ account or a sheet without re-running anything.
 ### 3.6 Prerequisites (console work, Jeffrey only)
 
 - **One Google OAuth client**, External, In Production, unverified. Scopes:
-  `gmail.modify`, `calendar.events`, `drive.readonly`, `spreadsheets`. Not the
+  `gmail.modify`, `calendar.readonly`, `drive.readonly`, `spreadsheets`. Not the
   probe project — a clean one. The client secret lives on the server, never in
   the installer.
 - **One Microsoft Entra registration**, multi-tenant plus personal accounts,
@@ -524,7 +524,7 @@ the cap counts grants, the real ceiling is closer to 25–30 owners. Measuring
 this is a plan task; the answer changes the business case, not the design.
 
 **Scope classifications** used here (`gmail.modify` restricted,
-`calendar.events` sensitive, `drive.readonly` restricted, `spreadsheets`
+`calendar.readonly` sensitive, `drive.readonly` restricted, `spreadsheets`
 sensitive) are from Google's published lists and are re-checked in the plan
 before the client is configured.
 
@@ -532,7 +532,11 @@ before the client is configured.
 
 ## 8. Assumptions to verify first
 
-Each is cheap, each would change the plan if wrong, so each is an early task:
+Each is cheap, each would change the plan if wrong, so each is an early task.
+**These are run first, as spikes, before the build order is fixed** — see
+`docs/superpowers/spikes/2026-09-22-phone-and-identity-spikes.md`, which turns
+items 1, 2, 5, 6, and 8 into six runnable probes with a decision table at the
+end. Items 3 and 4 are checked during the build.
 
 1. A **cloud Code session** (phone, Code tab) can reach a remote MCP connector
    over HTTP. Only memory has been proven there.
