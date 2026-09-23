@@ -85,6 +85,37 @@ Deployed with:
 npx wrangler deploy --temporary
 ```
 
+### Adding it as a connector at claude.ai failed first
+
+First attempt returned **403, "Not found"** on claude.ai's "Connecting to the
+server" step, then "Couldn't determine how this server signs in." Curl worked
+from the terminal, so the difference was in what claude.ai probes. Two defects
+in the Worker, both caused by routing every path to the MCP handler:
+
+1. **`OPTIONS /mcp` returned 405**, so the browser's CORS preflight failed.
+2. **The OAuth discovery paths returned 405** instead of 404. A 404 is the
+   correct "this server needs no authorization" answer; a 405 reads as a broken
+   server. That is the "couldn't determine how this server signs in" line.
+3. **The MCP responses carried no `Access-Control-Allow-Origin` header.** The
+   handler's own `corsOptions` did not add them, so they are set by wrapping
+   the response.
+
+The fix is in the source above: route only `/mcp` to the handler, answer
+`/.well-known/*` with 404, handle `OPTIONS` directly, and copy CORS headers
+onto every MCP response. Verified after redeploy:
+
+| Probe | Before | After |
+|---|---|---|
+| `OPTIONS /mcp` | 405 | 204 |
+| `/.well-known/oauth-protected-resource` | 405 | 404 |
+| `/.well-known/oauth-authorization-server` | 405 | 404 |
+| `access-control-allow-origin` on POST | absent | `*` |
+| `tools/call` | worked | worked |
+
+**This matters beyond the spike.** The real Geoffrey server has to answer the
+same probes the same way, and none of it was in the spec. It is a task in
+plan 2.
+
 ### Four findings that change the hosted design
 
 1. **No Durable Object, and no `agents` package.** MCP SDK v2 exports
