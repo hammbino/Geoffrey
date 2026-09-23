@@ -188,7 +188,11 @@ stdio process for local development and tests.
   selected repository can read and commit there and nowhere else, with
   installation tokens that do not expire with the owner's browser session. No
   Geoffrey password exists.
-- **Storage.** One Durable Object per owner holding: provider refresh tokens,
+- **Storage.** The MCP session itself needs no storage: spike 1 (2026-09-23)
+  confirmed a stateless Worker serves MCP over `/mcp` with no Durable Object
+  and no `agents` package, using `createMcpHandler` from
+  `@modelcontextprotocol/server` v2. The Durable Object is for *owner state*
+  only. One per owner holding: provider refresh tokens,
   the GitHub token and memory-repo name, the account registry (`id`,
   `provider`, `address`, `purpose`), and the sheet-write allowlist. No memory
   content is stored on the server; it is fetched from the repo per call.

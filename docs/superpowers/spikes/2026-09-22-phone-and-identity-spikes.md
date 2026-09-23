@@ -18,97 +18,117 @@ independent and can be done any time.
 ## Spike 1. A hello-world MCP server on a public URL
 
 **Question:** can we put an MCP server on a URL that Anthropic's cloud can
-reach? Everything about the hosted design assumes yes, and nothing has been
+reach? Everything about the hosted design assumes yes, and nothing had been
 deployed.
 
-**Why it matters:** this is the fixture for spikes 2, 3, and 4. Without it
-those three cannot be run at all.
+**Answer: yes.** Run 2026-09-23. Deployed, verified from the public internet,
+and it needed no Cloudflare login.
 
-**Do this:**
+**Live URL:** `https://geoffrey-spike.tarry-settee.workers.dev`
+**MCP endpoint:** `https://geoffrey-spike.tarry-settee.workers.dev/mcp`
 
-1. Install Wrangler if it is not present, and log in:
+### What was built
 
-   ```bash
-   npx wrangler login
-   ```
+`~/geoffrey-spike`, a plain Worker with one tool. Source in `src/index.js`:
 
-   A browser opens; authorize the Cloudflare account.
+```javascript
+import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
+import { z } from "zod";
 
-2. Create the spike in the scratch area (this is throwaway code. It does not
-   belong in the repo):
+function buildServer() {
+  const server = new McpServer({ name: "geoffrey-spike", version: "0.0.1" });
+  server.registerTool(
+    "hi",
+    {
+      title: "Say hi",
+      description:
+        "Returns a greeting with the name you pass and a live server timestamp. " +
+        "Used to prove this server was actually reached.",
+      inputSchema: { name: z.string().describe("Any name") },
+    },
+    async ({ name }) => ({
+      content: [{ type: "text", text: `hi ${name}, reached the spike server at ${new Date().toISOString()}` }],
+    })
+  );
+  return server;
+}
 
-   ```bash
-   mkdir -p ~/geoffrey-spike && cd ~/geoffrey-spike
-   npm init -y
-   npm install @modelcontextprotocol/sdk agents
-   ```
+// createMcpHandler returns { fetch, notify, bus, close }, not a bare function.
+const mcp = createMcpHandler(() => buildServer(), { route: "/mcp" });
 
-3. Write `src/index.ts`:
-
-   ```typescript
-   import { McpAgent } from "agents/mcp";
-   import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-   import { z } from "zod";
-
-   export class SpikeMCP extends McpAgent {
-     server = new McpServer({ name: "spike", version: "0.0.1" });
-
-     async init() {
-       this.server.tool(
-         "hi",
-         "Returns a greeting and the name you pass it. Used to prove this server is reachable.",
-         { name: z.string().describe("Any name") },
-         async ({ name }) => ({
-           content: [{ type: "text", text: `hi ${name}, reached the spike server at ${new Date().toISOString()}` }],
-         })
-       );
-     }
-   }
-
-   export default SpikeMCP.serveSSE("/sse");
-   ```
-
-4. Write `wrangler.toml`:
-
-   ```toml
-   name = "geoffrey-spike"
-   main = "src/index.ts"
-   compatibility_date = "2026-09-01"
-
-   [durable_objects]
-   bindings = [{ name = "MCP_OBJECT", class_name = "SpikeMCP" }]
-
-   [[migrations]]
-   tag = "v1"
-   new_sqlite_classes = ["SpikeMCP"]
-   ```
-
-5. Deploy:
-
-   ```bash
-   npx wrangler deploy
-   ```
-
-**You should see:** a deployed URL like
-`https://geoffrey-spike.<subdomain>.workers.dev`. Write it down, the next
-three spikes need it. The MCP endpoint is that URL plus `/sse`.
-
-**Check it before moving on:**
-
-```bash
-curl -N https://geoffrey-spike.<subdomain>.workers.dev/sse
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if (url.pathname === "/") {
+      return new Response(
+        `geoffrey-spike is up at ${new Date().toISOString()}\nMCP endpoint: ${url.origin}/mcp\n`,
+        { headers: { "Content-Type": "text/plain" } }
+      );
+    }
+    return mcp.fetch(request, env, ctx);
+  },
+};
 ```
 
-Expect an event stream to open and stay open (Ctrl-C to stop). A 404 or an
-immediate close means the deploy did not work; fix that before spike 2.
+`wrangler.toml`:
 
-**If this fails:** stop and report what Wrangler said. Everything hosted
-depends on this and there is no point running spikes 2–4 without it.
+```toml
+name = "geoffrey-spike"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+```
+
+Deployed with:
+
+```bash
+npx wrangler deploy --temporary
+```
+
+### Four findings that change the hosted design
+
+1. **No Durable Object, and no `agents` package.** MCP SDK v2 exports
+   `createMcpHandler` from `@modelcontextprotocol/server` directly, and a
+   stateless server needs no per-session storage. The spec's §3.1 "one Durable
+   Object per owner" is still right, but for *owner state* (tokens, account
+   registry, allowlist), not for the MCP session. That is a simpler Worker than
+   planned.
+2. **`createMcpHandler` returns an object, not a function.** Call
+   `mcp.fetch(request, env, ctx)`. Calling the result directly throws
+   `TypeError: mcp is not a function`, which is how this spike first failed.
+3. **The route is `/mcp`, not `/sse`.** SSE is the older transport. Every
+   later spike and the installer's connector URL use `/mcp`.
+4. **`wrangler deploy --temporary` needs no Cloudflare account.** It solves a
+   proof-of-work challenge and creates a throwaway account, claimable within 60
+   minutes. Ideal for a spike. The real deployment needs a real account.
+
+### Verified
+
+Local first (`npx wrangler dev`), then against the public URL:
+
+```bash
+U=https://geoffrey-spike.tarry-settee.workers.dev
+curl -s $U/
+curl -s -X POST $U/mcp -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
+curl -s -X POST $U/mcp -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"hi","arguments":{"name":"Jeffrey"}}}'
+```
+
+All three returned what they should. The tool call came back with
+`hi Jeffrey, reached the spike server at 2026-09-23T03:33:32.775Z`, a live
+timestamp from the server rather than an invented answer. Protocol version
+negotiated down to `2025-11-25`, which the client and server agreed on.
+
+**Caveat:** the temporary account is unclaimed. If the Worker stops answering,
+redeploy with the same command and update the URL in spikes 2, 3, and 4.
 
 > **Result:**
-> URL:
-> Date run:
-> Outcome:
+> URL: https://geoffrey-spike.tarry-settee.workers.dev/mcp
+> Date run: 2026-09-23
+> Outcome: PASS. Reachable from the public internet, full MCP round trip.
 
 ---
 
@@ -125,7 +145,7 @@ v1 leaves the critical path.
 
 1. On a computer, go to <https://claude.ai/settings/connectors>.
 2. **Add custom connector.** Name it `Spike`. URL: the spike URL from spike 1
-   **with `/sse` on the end**.
+   **with `/mcp` on the end**.
 3. Save. It should appear in the list as connected.
 4. In a chat **on the computer** first, say: *"Use the Spike connector's hi
    tool with the name Jeffrey."* Confirm it works there.
@@ -176,8 +196,8 @@ memory-only forever.
    {
      "mcpServers": {
        "spike": {
-         "type": "sse",
-         "url": "https://geoffrey-spike.<subdomain>.workers.dev/sse"
+         "type": "http",
+         "url": "https://geoffrey-spike.tarry-settee.workers.dev/mcp"
        }
      }
    }
