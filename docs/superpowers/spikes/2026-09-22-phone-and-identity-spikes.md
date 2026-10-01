@@ -24,8 +24,8 @@ deployed.
 **Answer: yes.** Run 2026-09-23. Deployed, verified from the public internet,
 and it needed no Cloudflare login.
 
-**Live URL:** `https://geoffrey-spike.tarry-settee.workers.dev`
-**MCP endpoint:** `https://geoffrey-spike.tarry-settee.workers.dev/mcp`
+**Live URL:** `https://geoffrey-spike.nerdherojeff.workers.dev`
+**MCP endpoint:** `https://geoffrey-spike.nerdherojeff.workers.dev/mcp`
 
 ### What was built
 
@@ -138,7 +138,7 @@ plan 2.
 Local first (`npx wrangler dev`), then against the public URL:
 
 ```bash
-U=https://geoffrey-spike.tarry-settee.workers.dev
+U=https://geoffrey-spike.tarry-settee.workers.dev   # expired 2026-10-01, see below
 curl -s $U/
 curl -s -X POST $U/mcp -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
@@ -156,9 +156,77 @@ negotiated down to `2025-11-25`, which the client and server agreed on.
 **Caveat:** the temporary account is unclaimed. If the Worker stops answering,
 redeploy with the same command and update the URL in spikes 2, 3, and 4.
 
+### Redeployed 2026-10-01 on a real account, and the protocol got stricter
+
+The temporary deployment expired after eight days. Its hostname stopped
+resolving in DNS, which took the request log with it and left the Spike 2
+403 unreproducible. Lesson: `--temporary` is fine for "does this boot",
+wrong for anything a third party has to reach later.
+
+Redeployed after `wrangler login` against Jeffrey's own Cloudflare account
+(`nerdherojeff@gmail.com`, account `09d0cf4bdd84dc1e976cced0d94f1689`).
+New URL: `https://geoffrey-spike.nerdherojeff.workers.dev`.
+
+Two fixes the move required:
+
+1. `@modelcontextprotocol/server` was never a direct dependency. The code
+   imported it and it only resolved because `agents` pulled it in. Pinned
+   it in `package.json`, which upgraded 2.0.0 to 2.2.0.
+2. `allowedHostnames` was pinned to the old subdomain. Every account gets a
+   different `*.workers.dev` hostname, so this has to be configuration in
+   the real server, not a literal.
+
+**2.2.0 enforces the stateless envelope, and 2.0.0 did not.** Calls that
+worked on 2026-09-23 now fail until the request carries all of:
+
+- `params._meta` present at all
+- `_meta["io.modelcontextprotocol/protocolVersion"]`
+- `_meta["io.modelcontextprotocol/clientCapabilities"]`
+- an `Mcp-Method` header matching the body's `method`
+- an `Mcp-Name` header matching `params.name`, for `tools/call`
+
+The server rejects any disagreement between headers and body with
+`-32020 Bad Request: the request headers and body disagree`.
+
+This is revision 2026-07-28 working as designed. With sessions removed there
+is no handshake to remember, so each request re-declares the protocol version
+and client capabilities that `initialize` used to establish. The duplicated
+headers let infrastructure route and authorize without parsing the JSON body:
+a gateway can permit `tools/list` and deny `tools/call` on headers alone, and
+the header/body agreement check stops a request from showing a proxy one
+method and the server another.
+
+**Consequence for the real server.** Geoffrey's hosted MCP server inherits
+this, which suits Workers well: no per-connection memory means a cold isolate
+anywhere can serve any request. Two requirements fall out for plan 2. Pin the
+SDK to an exact version rather than a caret range, because a minor bump
+tightened protocol validation. And treat the hostname as config.
+
+### Verified on the new URL
+
+```bash
+U=https://geoffrey-spike.nerdherojeff.workers.dev
+META='"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}'
+
+curl -s -o /dev/null -w "%{http_code}\n" $U/                                       # 200
+curl -s -o /dev/null -w "%{http_code}\n" -X OPTIONS $U/mcp \
+  -H "Origin: https://claude.ai" -H "Access-Control-Request-Method: POST"          # 204
+curl -s -o /dev/null -w "%{http_code}\n" $U/.well-known/oauth-protected-resource   # 404
+curl -s -o /dev/null -w "%{http_code}\n" $U/.well-known/oauth-authorization-server # 404
+
+curl -s -X POST $U/mcp \
+  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -H "mcp-protocol-version: 2026-07-28" -H "Mcp-Method: tools/call" -H "Mcp-Name: hi" \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{$META,\"name\":\"hi\",\"arguments\":{\"name\":\"Jeffrey\"}}}"
+```
+
+The tool call returned `hi Jeffrey, reached the spike server at
+2026-10-01T20:42:17.973Z`, a live server timestamp. `/log` confirmed it
+records `user-agent`, so Anthropic's probe is distinguishable from local curl.
+
 > **Result:**
-> URL: https://geoffrey-spike.tarry-settee.workers.dev/mcp
-> Date run: 2026-09-23
+> URL: https://geoffrey-spike.nerdherojeff.workers.dev/mcp
+> Date run: 2026-09-23, redeployed 2026-10-01
 > Outcome: PASS. Reachable from the public internet, full MCP round trip.
 
 ---
@@ -228,7 +296,7 @@ memory-only forever.
      "mcpServers": {
        "spike": {
          "type": "http",
-         "url": "https://geoffrey-spike.tarry-settee.workers.dev/mcp"
+         "url": "https://geoffrey-spike.nerdherojeff.workers.dev/mcp"
        }
      }
    }
