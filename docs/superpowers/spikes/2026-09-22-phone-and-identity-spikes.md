@@ -267,12 +267,71 @@ picker. That detail goes into the installer's step 6 instructions.
   (spike 3), the first user gets Mac + Code tab, and roughly half the build
   disappears. Say so loudly; it is good news for the schedule.
 
+### What actually happened
+
+The connector attached on the first try at the new URL. The dialog's
+Authentication section pre-selected **No sign-in** with a **Detected** badge,
+which is the check that failed on 2026-09-23 with 403 "Couldn't determine how
+this server signs in". The three CORS and `.well-known` fixes from spike 1 were
+what it needed. The repeated 403 on the second attempt that day was a stale
+result, not a live failure.
+
+On the phone, the tool returned a greeting. Verified independently rather than
+on the strength of the reply text, because the in-memory `/log` endpoint turned
+out not to work (see below).
+
+**Verification by Cloudflare analytics.** The GraphQL API aggregates across
+isolates, and the OAuth token `wrangler login` writes is already scoped for it:
+
+```bash
+TOKEN=$(grep '^oauth_token' ~/Library/Preferences/.wrangler/config/default.toml \
+  | sed -E 's/^oauth_token *= *"?([^"]*)"?/\1/')
+curl -s https://api.cloudflare.com/client/v4/graphql \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"query":"query{viewer{accounts(filter:{accountTag:\"<ACCOUNT_ID>\"}){workersInvocationsAdaptive(limit:500, filter:{scriptName:\"geoffrey-spike\", datetime_geq:\"<ISO8601>\"}){sum{requests}dimensions{datetime}}}}}"}'
+```
+
+Timeline on 2026-10-01, all UTC:
+
+| Window | Requests | Source |
+|---|---|---|
+| 20:41:27 to 20:42:26 | 15 | local curl verification |
+| 21:15:32 | 1 | local curl, the `/log` check |
+| 21:18:11 to 21:19:38 | 13 | not local |
+
+Zero errors throughout. The burst of eight within four seconds at 21:18:11 is
+the connector being added and introspected. The two at 21:19:37 a minute later
+are the phone calling the tool. Nothing local ran after 21:15:32, so the server
+was genuinely reached from the phone.
+
+**`/log` does not work, and the reason matters.** The `RECENT` array lives in
+module scope, which on Workers means it lives in one isolate. Isolates are
+created and discarded per request, so the array that answers `/log` is usually
+a fresh one that has seen nothing. It reported zero even for requests confirmed
+by analytics. This is the same statelessness the 2.2.0 SDK enforces, seen from
+the other side, and it confirms spec §3.1 by demonstration: the account
+registry, OAuth tokens, and sheet allowlist cannot live in module scope. They
+need a Durable Object.
+
+**The connector had to be enabled in the chat before the phone would use it.**
+No re-authorization was needed, the connector carried over from claude.ai
+automatically, but it was off by default in a new chat. This is a required step
+in the installer's instructions. An owner who adds the connector on a laptop
+and then opens the phone will be told Claude cannot do that, unless they are
+told to switch it on.
+
 > **Result:**
-> Date run:
-> Tool called on phone? (yes/no):
-> Timestamp returned:
-> Re-authorization needed?:
-> Outcome:
+> Date run: 2026-10-01
+> Tool called on phone? yes
+> Verified how: Cloudflare analytics, 13 non-local requests, 0 errors
+> Re-authorization needed? no, it carried over from claude.ai
+> Had to enable in chat? yes, off by default in a new chat
+> Outcome: PASS. Phone chat reaches a custom connector and calls its tools.
+
+**What this settles.** Hosting stays in v1. Phone chat is a real surface. Build
+order is plan 1 (local capability), then the hosted server, then the fork plus
+installer. Spike 3 drops from gate to nice-to-have: it existed as the fallback
+route if chat failed, and chat did not fail.
 
 ---
 
@@ -520,6 +579,24 @@ Fill in every result box, then the build order follows from the answers:
 
 Spike 5 (skills on phone) and spike 4 (voice) change what the docs promise, not
 what gets built. Spike 6 gates plan 2 regardless of the phone answers.
+
+### Settled 2026-10-01
+
+Spike 2 answered **yes**, which puts us in one of the first two rows. Both give
+the same build order, so spike 3 cannot change it:
+
+**Plan 1 (local capability) → hosted server → fork plus installer.**
+
+Spike 3 drops from gate to nice-to-have. It is still worth running before the
+docs ship, because it decides whether the phone's Code tab is a full surface or
+memory-only, and that is a sentence in the owner's instructions. It is no longer
+blocking anything.
+
+Spike 6 (GitHub App commits to one repo) is now the only remaining spike that
+gates a plan. Run it before plan 2.
+
+Remaining order: start plan 1 now, run spike 6 before plan 2, run spikes 3, 4,
+and 5 before the docs are written.
 
 **Clean up when done:** `npx wrangler delete` the spike Worker, remove the
 Spike connector at claude.ai, uninstall the GitHub App, and delete
